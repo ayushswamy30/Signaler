@@ -202,6 +202,44 @@ against exactly that.
 
 Then generate the migration, read it, and apply it — see below.
 
+## Deploying
+
+The backend needs a host of its own: it holds long-lived WebSocket connections,
+which serverless platforms such as Vercel cannot serve. [`render.yaml`](../render.yaml)
+in the repository root defines the whole deployment — a web service and a
+Postgres database — so it is reviewable and reproducible rather than clicked
+together in a dashboard.
+
+Two things about the deployed configuration are worth knowing:
+
+- **Postgres, not SQLite.** A free instance has an ephemeral filesystem, so a
+  SQLite file would be lost on every restart, taking every account with it.
+  Managed providers hand out a `postgres://` URL, which SQLAlchemy has not
+  accepted since 1.4; `Settings.sqlalchemy_url` normalises it to the psycopg
+  driver so `DATABASE_URL` can be used exactly as the provider gives it.
+- **Migrations run at start, not at build.** The build has no database
+  attached. `alembic upgrade head` is idempotent, so running it on every start
+  is safe for restarts and for a second instance.
+
+The frontend is deployed separately and needs `NEXT_PUBLIC_API_URL` pointing at
+the backend. That variable is inlined at build time, so changing it requires a
+redeploy, not just a restart — and if it is missing, the built bundle falls back
+to `http://127.0.0.1:8000` and every request fails in the visitor's browser.
+
+Set `CORS_ORIGINS` to the frontend's origin. Preview deployments get a new
+hostname per commit and cannot be listed, so `CORS_ORIGIN_REGEX` matches them
+instead; anchor any pattern at both ends, since a loose one hands any matching
+site credentialed access to the API.
+
+Check a deployment with the same scenario the suite runs locally:
+
+```bash
+SMOKE_BASE_URL=https://<your-service>.onrender.com python -m scripts.smoke_e2e
+```
+
+It registers `smoke_*` accounts and leaves them behind, so run it against a
+demo deployment rather than one with real users.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`.

@@ -1,0 +1,68 @@
+# Render blueprint: the backend and its database.
+#
+# Checked in so the deployment is reviewable and reproducible rather than
+# clicked together in a dashboard. Apply it from Render's "New > Blueprint",
+# pointed at this repository.
+#
+# The frontend is not here: it is deployed separately on Vercel, which needs
+# NEXT_PUBLIC_API_URL set to this service's URL. That variable is read at build
+# time, so changing it requires a redeploy, not just a restart.
+
+databases:
+  - name: signaler-db
+    plan: free
+    databaseName: signaler
+    user: signaler
+    # Same region as the web service. A database in another region would add a
+    # round trip to every query in a request.
+    region: singapore
+
+services:
+  - type: web
+    name: signaler-api
+    runtime: python
+    plan: free
+    region: singapore
+    # alembic.ini, requirements.txt and the app package all resolve relative to
+    # backend/, exactly as they do locally.
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Migrations run on start rather than during the build: the build has no
+    # database attached, and `alembic upgrade head` is idempotent, so a restart
+    # or a second instance is harmless.
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Render restarts the instance if this stops answering.
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+
+      # Bound from the database above, so the credentials are never written
+      # down anywhere. Render supplies a postgres:// URL, which the application
+      # normalises -- see Settings.sqlalchemy_url.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signaler-db
+          property: connectionString
+
+      # Generated once by Render and never seen by anyone. Anyone holding this
+      # value can forge an access token for any account, so it must not be
+      # committed, shared, or reused from development.
+      - key: JWT_SECRET_KEY
+        generateValue: true
+
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+
+      # The deployed frontend. Set in the dashboard rather than committed, so
+      # the domain can change without a code change.
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Vercel gives every preview deployment its own hostname, so previews
+      # cannot be listed one by one. Anchored at both ends, and the dot before
+      # vercel.app is escaped, so it matches this project's deployments only.
+      - key: CORS_ORIGIN_REGEX
+        value: ^https://signaler-[a-z0-9-]+\.vercel\.app$

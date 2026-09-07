@@ -28,7 +28,7 @@ target_metadata = Base.metadata
 # Normally the URL comes from application settings. A caller (the test suite)
 # may override it via config to migrate a different database; when it does not,
 # behaviour is exactly as before.
-_url = config.get_main_option("sqlalchemy.url", default=None) or settings.database_url
+_url = config.get_main_option("sqlalchemy.url", default=None) or settings.sqlalchemy_url
 
 # SQLite cannot ALTER most columns in place, so Alembic must rebuild tables
 # via its batch mode for future schema changes to work.
@@ -53,7 +53,7 @@ def run_migrations_online() -> None:
     """Run migrations against a live database connection."""
     # Reuse the application's engine for the application's own database; build a
     # matching one (same SQLite pragmas) when migrating an overridden URL.
-    connectable = engine if _url == settings.database_url else create_app_engine(_url)
+    connectable = engine if _url == settings.sqlalchemy_url else create_app_engine(_url)
 
     with connectable.connect() as connection:
         context.configure(

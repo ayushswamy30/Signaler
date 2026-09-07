@@ -28,7 +28,7 @@ request.
 
 - **Backend** — Python 3.11, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic, pytest
 - **Auth** — bcrypt password hashing, JWT access tokens, opaque rotating refresh tokens
-- **Database** — SQLite (the schema is written to stay portable to PostgreSQL)
+- **Database** — SQLite in development, PostgreSQL when deployed; the same models and migrations build both
 - **Frontend** — Next.js 15 (App Router), TypeScript, Tailwind CSS
 
 ## Quick start
@@ -172,6 +172,35 @@ Decisions that shaped the codebase; the schema reasoning is in full in
   cascade; conversation membership and messages do not, so deleting an account
   cannot silently erase history from other people's conversations.
 
+## Deploying
+
+The client and the API are hosted separately, because FastAPI's WebSockets need
+a long-lived process and cannot run on Vercel's serverless functions.
+
+| Piece | Host | Configuration |
+| --- | --- | --- |
+| Frontend | Vercel | `NEXT_PUBLIC_API_URL` = the backend's URL. Inlined at build time, so changing it needs a redeploy. |
+| Backend + database | Render | Defined by [`render.yaml`](render.yaml). Set `CORS_ORIGINS` to the frontend's origin. |
+
+If `NEXT_PUBLIC_API_URL` is not set, the built bundle falls back to
+`http://127.0.0.1:8000` — the visitor's own machine — and every request fails in
+their browser with "Cannot reach the server". That fallback is right for local
+development and wrong everywhere else, which is why the deploy sets it
+explicitly.
+
+The deployed backend runs on Postgres rather than SQLite: a free instance has an
+ephemeral filesystem, so a SQLite file would be lost on every restart along with
+every account in it. Nothing in the application changes between the two —
+`Settings.sqlalchemy_url` normalises the provider's `postgres://` URL to the
+psycopg driver, and the same migrations build both schemas.
+
+Verify a deployment with the same scenario the local suite runs:
+
+```bash
+cd backend
+SMOKE_BASE_URL=https://<your-service>.onrender.com python -m scripts.smoke_e2e
+```
+
 ## Known limits
 
 Deliberate, and listed so they are not mistaken for oversights:
@@ -185,6 +214,10 @@ Deliberate, and listed so they are not mistaken for oversights:
   message type column is sized to accept them later without a schema change.
 - **Phone verification and photo upload are placeholders**, shown in the UI and
   labelled as such.
+- **A free-tier deployment sleeps.** After 15 minutes without traffic the
+  instance stops; the next request takes roughly a minute to wake it, and open
+  WebSockets drop in the meantime. The client reconnects on its own, but live
+  delivery pauses while the server is asleep.
 
 The design lives in [design/](design/): the token spec in
 [design-tokens.md](design/design-tokens.md), and the design system plus 21

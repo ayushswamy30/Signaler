@@ -63,6 +63,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
+    # Starlette treats an empty pattern as "no regex", but passing None is the
+    # unambiguous way to say it, so a blank setting cannot widen the policy.
+    allow_origin_regex=settings.cors_origin_regex or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

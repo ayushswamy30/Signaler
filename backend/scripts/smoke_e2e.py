@@ -8,6 +8,15 @@ lifespan that binds the event loop, and CORS.
 
     python -m scripts.smoke_e2e
 
+Point it at an already-running server instead -- a deployed one, say -- with:
+
+    SMOKE_BASE_URL=https://signaler-api.onrender.com python -m scripts.smoke_e2e
+
+That form starts nothing and migrates nothing; it exercises whatever is behind
+that URL, which is how a production deployment gets checked against the same
+scenario as a local one. It registers real accounts named ``smoke_*`` and leaves
+them behind, so use it on a demo deployment, not on one with real users.
+
 Exits non-zero on the first failed check, so it is usable as a deployment gate.
 """
 
@@ -30,6 +39,8 @@ import websockets
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 HOST = "127.0.0.1"
 PORT = 8123
+
+# Rebound by main() when SMOKE_BASE_URL targets an already-running server.
 BASE = f"http://{HOST}:{PORT}"
 WS_BASE = f"ws://{HOST}:{PORT}"
 
@@ -97,10 +108,18 @@ async def next_event(socket: Any, wanted: str) -> dict[str, Any]:
 
 
 async def run() -> None:
+    # Unique per run, and prefixed so accounts left behind in a deployed
+    # database are recognisable as test data, not mistaken for real sign-ups.
     stamp = str(int(time.time()))
-    alice_name, bob_name, carol_name = (f"alice{stamp}", f"bob{stamp}", f"carol{stamp}")
+    alice_name, bob_name, carol_name = (
+        f"smoke_a{stamp}",
+        f"smoke_b{stamp}",
+        f"smoke_c{stamp}",
+    )
 
-    async with httpx.AsyncClient(base_url=BASE, timeout=10) as http:
+    # Generous, because a free-tier instance that has scaled to zero can take
+    # the better part of a minute to answer its first request.
+    async with httpx.AsyncClient(base_url=BASE, timeout=60) as http:
         print("\nRegistration and sign-in")
         accounts = {}
         for username in (alice_name, bob_name, carol_name):
@@ -272,10 +291,23 @@ async def run() -> None:
 
 
 def main() -> None:
+    global BASE, WS_BASE
+
+    # Against an already-running server there is nothing to start and nothing
+    # to migrate: the point is to exercise whatever is actually deployed.
+    remote = os.environ.get("SMOKE_BASE_URL")
+    if remote:
+        BASE = remote.rstrip("/")
+        WS_BASE = BASE.replace("https://", "wss://").replace("http://", "ws://")
+        print(f"Testing the server already running at {BASE}")
+        asyncio.run(run())
+        print()
+        print(f"All {passed} checks passed.")
+        return
+
     workspace = tempfile.mkdtemp(prefix="signaler-smoke-")
     database = Path(workspace) / "smoke.db"
     database_url = f"sqlite:///{database.as_posix()}"
-
     print(f"Migrating a throwaway database at {database}")
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],

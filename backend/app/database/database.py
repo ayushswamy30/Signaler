@@ -53,7 +53,7 @@ def create_app_engine(url: str) -> Engine:
     return new_engine
 
 
-engine = create_app_engine(settings.database_url)
+engine = create_app_engine(settings.sqlalchemy_url)
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 

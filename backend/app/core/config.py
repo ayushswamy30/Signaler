@@ -20,8 +20,31 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./signaler.db"
 
+    @property
+    def sqlalchemy_url(self) -> str:
+        """The database URL in the form SQLAlchemy expects.
+
+        Managed Postgres providers hand out ``postgres://...``, which SQLAlchemy
+        has not accepted since 1.4, and a bare ``postgresql://`` selects
+        psycopg2 while this project installs psycopg 3. Normalising here means
+        ``DATABASE_URL`` can be pasted straight from the provider's dashboard
+        -- or bound from a Render blueprint -- without being edited first.
+        """
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://"):]
+        if url.startswith("postgresql://"):
+            url = "postgresql+psycopg://" + url[len("postgresql://"):]
+        return url
+
     # Comma-separated in the environment, e.g. "http://localhost:3000,http://127.0.0.1:3000".
     cors_origins: str = "http://localhost:3000"
+
+    # Optional pattern for origins that cannot be listed literally, because the
+    # hostname changes per deployment -- Vercel preview builds, for instance.
+    # Empty by default: an unanchored or careless pattern here would hand any
+    # matching site the ability to make credentialed calls to this API.
+    cors_origin_regex: str = ""
 
     # Authentication. The secret MUST be replaced outside development: every
     # access token in circulation is forgeable by anyone who knows it.
