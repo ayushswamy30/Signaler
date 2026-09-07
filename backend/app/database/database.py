@@ -1,8 +1,10 @@
 """SQLAlchemy engine, session factory, and the FastAPI session dependency."""
 
 from collections.abc import Generator
+from typing import Any
 
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import MetaData, create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
@@ -19,11 +21,39 @@ NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
 }
 
-# check_same_thread is a SQLite-only flag; FastAPI serves requests from a
-# thread pool, so connections must be usable across threads.
-_connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
 
-engine = create_engine(settings.database_url, connect_args=_connect_args)
+def _enable_sqlite_foreign_keys(dbapi_connection: Any, connection_record: Any) -> None:
+    """Turn on foreign-key enforcement for a new SQLite connection.
+
+    SQLite ignores foreign keys unless this pragma is set, and the setting is
+    per-connection rather than per-database, so it has to be reapplied every
+    time the pool opens one. Without it ON DELETE clauses are silently inert on
+    SQLite while behaving normally on PostgreSQL.
+    """
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
+def create_app_engine(url: str) -> Engine:
+    """Build an engine configured the way this application expects.
+
+    Tests build engines for temporary databases through this function so they
+    get the same SQLite behaviour as the running application.
+    """
+    # check_same_thread is a SQLite-only flag; FastAPI serves requests from a
+    # thread pool, so connections must be usable across threads.
+    connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
+    new_engine = create_engine(url, connect_args=connect_args)
+
+    # Guarded by dialect so nothing SQLite-specific reaches a PostgreSQL engine.
+    if new_engine.dialect.name == "sqlite":
+        event.listen(new_engine, "connect", _enable_sqlite_foreign_keys)
+
+    return new_engine
+
+
+engine = create_app_engine(settings.database_url)
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 

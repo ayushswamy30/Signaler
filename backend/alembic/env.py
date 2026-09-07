@@ -10,7 +10,7 @@ from logging.config import fileConfig
 from alembic import context
 
 from app.core.config import settings
-from app.database.database import Base, engine
+from app.database.database import Base, create_app_engine, engine
 
 # Importing the models package registers every ORM model on Base.metadata.
 # It is intentionally empty at this stage; autogenerate picks up models as
@@ -25,15 +25,20 @@ if config.config_file_name is not None:
 # The single source of truth for the schema Alembic compares against.
 target_metadata = Base.metadata
 
+# Normally the URL comes from application settings. A caller (the test suite)
+# may override it via config to migrate a different database; when it does not,
+# behaviour is exactly as before.
+_url = config.get_main_option("sqlalchemy.url", default=None) or settings.database_url
+
 # SQLite cannot ALTER most columns in place, so Alembic must rebuild tables
 # via its batch mode for future schema changes to work.
-_render_as_batch = settings.database_url.startswith("sqlite")
+_render_as_batch = _url.startswith("sqlite")
 
 
 def run_migrations_offline() -> None:
     """Emit migration SQL without connecting to the database."""
     context.configure(
-        url=settings.database_url,
+        url=_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -46,7 +51,11 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations against a live database connection."""
-    with engine.connect() as connection:
+    # Reuse the application's engine for the application's own database; build a
+    # matching one (same SQLite pragmas) when migrating an overridden URL.
+    connectable = engine if _url == settings.database_url else create_app_engine(_url)
+
+    with connectable.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
