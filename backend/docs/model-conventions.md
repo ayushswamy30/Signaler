@@ -70,10 +70,11 @@ sender_id: Mapped[int] = mapped_column(
 )
 ```
 
-Note that SQLite does **not** enforce foreign keys unless `PRAGMA foreign_keys=ON`
-is set per connection. That pragma is not enabled yet; enable it when the first
-real foreign key lands, otherwise `ondelete` is silently inert in development
-while behaving differently on PostgreSQL.
+SQLite does not enforce foreign keys unless `PRAGMA foreign_keys=ON` is set per
+connection. This is now enabled for every SQLite connection by the engine
+factory in `app/database/database.py`, so `ondelete` behaves in development the
+way it will on PostgreSQL. Model tests get the same enforcement, because they
+build their engine through that same factory.
 
 ## Relationships
 
@@ -146,3 +147,303 @@ means adding a member produces no schema diff.
   in service code — concurrent requests defeat application-level checks.
 - Add an index only for a query the code actually makes. Every index costs write
   throughput. Foreign keys used for lookups are the usual justified case.
+
+## Models
+
+### User (`app/models/user.py`)
+
+A registered account, and the parent entity for contacts, conversation
+participants and messages in later stages.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | int | Surrogate primary key, `pk_users` |
+| `username` | `String(50)` | Required, unique (`uq_users_username`) |
+| `phone_number` | `String(32)` | Optional, unique when present |
+| `display_name` | `String(100)` | Required; the visible name |
+| `avatar_url` | `String(512)` | Optional |
+| `password_hash` | `String(255)` | Required; a hash, never a password |
+| `is_online` | bool | Required, defaults to `False` |
+| `last_seen` | `UtcDateTime` | Optional |
+| `created_at` / `updated_at` | `UtcDateTime` | From `TimestampMixin` |
+
+Decisions worth knowing:
+
+- **`phone_number` is nullable but unique.** SQL treats NULLs as distinct in a
+  unique constraint, so any number of accounts may have no phone number while a
+  given number can still be claimed only once. No partial index is needed, and
+  there is a test proving it — get this wrong and exactly one phoneless account
+  is possible.
+- **No explicit index on `username` or `phone_number`.** A unique constraint is
+  already backed by a unique index, so `index=True` would only add a second,
+  redundant index on the same column.
+- **`password_hash` holds a hash and nothing else.** The model does no hashing
+  and exposes no password helpers; that is the service layer's job.
+- **Presence is not managed by the model.** `is_online` and `last_seen` have no
+  `onupdate` hook, so an unrelated profile edit cannot silently mark someone
+  online or move their last-seen time. Services and the WebSocket layer write
+  them deliberately.
+- **Timestamps follow the existing convention**: `TimestampMixin` for
+  `created_at` / `updated_at`, `UtcDateTime` for `last_seen`, all
+  Python-generated, aware UTC, microsecond precision.
+
+### Contact (`app/models/contact.py`)
+
+A directed link: `user_id` has saved `contact_user_id` as a contact. A saving B
+says nothing about whether B has saved A — those are two independent rows.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `user_id` | int FK → `users.id` | Part of the primary key, `ON DELETE CASCADE` |
+| `contact_user_id` | int FK → `users.id` | Part of the primary key, `ON DELETE CASCADE` |
+| `created_at` | `UtcDateTime` | When the link was made |
+
+Decisions worth knowing:
+
+- **Composite primary key `(user_id, contact_user_id)`.** The pair *is* the
+  identity of the row, so a surrogate `id` would add a column and an index
+  without expressing anything. It also makes "A added B twice" a primary-key
+  violation, so no separate unique constraint is needed — adding one over the
+  same columns would only duplicate the index.
+- **No `updated_at`.** A contact row records that a link was made; it is not
+  edited afterwards, so `TimestampMixin` would add a column that never changes.
+  `created_at` uses the same `UtcDateTime` + `utcnow` convention the mixin does.
+- **Both foreign keys cascade on delete.** A contact row is meaningless once
+  either participant is gone, so deleting a user removes both the contacts they
+  saved and the contacts pointing at them. The cascade lives in the *database*,
+  not only in relationship configuration, so rows cannot survive a delete that
+  bypasses the ORM.
+- **Two relationships, deliberately distinct names.** `user.contacts` is the
+  people this user saved; `user.contact_of` is the rows where this user is the
+  saved contact. Both foreign keys point at `users.id`, so SQLAlchemy cannot
+  infer which one each relationship travels — `foreign_keys=` is required, not
+  optional. Both use `passive_deletes=True` so the database performs the
+  cascade rather than the ORM loading every row to delete it.
+- **Self-contact is an application rule, not a database invariant.** Nothing
+  stops `A → A` at the database level today; there is no CHECK constraint, and
+  the model test documents that honestly rather than implying a guard that does
+  not exist. The Contacts service must reject it when that layer is built.
+
+### Conversation and ConversationParticipant
+
+One `conversations` table serves both direct and group conversations,
+distinguished by `ConversationType` (`DIRECT` / `GROUP`). Separate tables would
+duplicate the participant, message and read-state machinery for no gain, since
+everything below a conversation is identical either way.
+
+**conversations**
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | int | Primary key |
+| `type` | `ConversationType` | Required; `direct` or `group` |
+| `name` | `String(100)` | Optional; groups are named, direct ones are labelled by the other participant |
+| `avatar_url` | `String(512)` | Optional |
+| `created_at` / `updated_at` | `UtcDateTime` | From `TimestampMixin` |
+
+**conversation_participants**
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `conversation_id` | int FK → `conversations.id` | Part of the primary key, `ON DELETE CASCADE` |
+| `user_id` | int FK → `users.id` | Part of the primary key, `ON DELETE RESTRICT`, indexed |
+| `role` | `ParticipantRole` | Required, defaults to `MEMBER` |
+| `joined_at` | `UtcDateTime` | When the user joined |
+| `last_read_message_id` | int | Nullable, **no foreign key yet** |
+
+Decisions worth knowing:
+
+- **Participants are an association object, not a plain many-to-many.** The
+  membership carries its own state — role, join time, read position — so there
+  is no `User.conversations` shortcut; hiding the association behind a
+  many-to-many would obscure the thing callers actually need.
+- **Composite primary key `(conversation_id, user_id)`**, the same pattern as
+  `Contact`: a user cannot join the same conversation twice, enforced by the
+  key rather than a separate unique constraint.
+- **Deleting a conversation cascades to its participants**; membership cannot
+  outlive its conversation.
+- **Deleting a user is RESTRICTed, not cascaded.** Removing an account must not
+  silently erase its membership of a group conversation, which is part of that
+  conversation's history for everyone else. The database refuses the delete
+  while membership exists, so account deletion has to be designed rather than
+  defaulting to destruction. **The account-deletion strategy (tombstone or soft
+  delete) is an open decision** — `User` was deliberately not changed here.
+- **`last_read_message_id` is a bare integer** until the `Message` model
+  exists. Adding a placeholder Message model just to satisfy the foreign key
+  would be worse than waiting; a later migration adds the reference to
+  `messages.id`.
+- **`user_id` is indexed.** The composite primary key already covers lookups
+  starting with `conversation_id` ("who is in this conversation?"), but not
+  ones starting with `user_id` ("every conversation this user is in") — the
+  query behind the conversation list, on the app's main screen.
+- **Direct-conversation uniqueness is a service-layer invariant.** Participants
+  live in a child table, so no column constraint can express "this pair
+  already has a direct conversation". The schema permits duplicates; the
+  `ConversationService` must look for an existing `DIRECT` conversation
+  containing exactly those two users before creating one. This is deliberate,
+  not an oversight, and a test records the current behaviour honestly.
+- **Conversation shape and group role rules are service-layer invariants too**
+  — that a direct conversation has exactly two participants, that a group has a
+  name, that a group keeps at least one admin. Encoding them in the schema
+  would make ordinary steps impossible, since a conversation must exist before
+  its participants can reference it. `ADMIN` and `MEMBER` are structural only;
+  no authorisation logic lives in the model.
+
+### Message and MessageStatus
+
+**messages**
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | int | Primary key |
+| `conversation_id` | int FK → `conversations.id` | Required, `ON DELETE CASCADE` |
+| `sender_id` | int FK → `users.id` | Required, `ON DELETE RESTRICT`, indexed |
+| `content` | `Text` | Required; not validated here |
+| `message_type` | `MessageType` | Required; only `TEXT` today |
+| `reply_to_id` | int FK → `messages.id` | Nullable, `ON DELETE SET NULL`, indexed |
+| `created_at` | `UtcDateTime` | Required |
+| `edited_at` / `expires_at` | `UtcDateTime` | Nullable; written by services, never by the model |
+
+**message_status** — one row per (message, recipient)
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | int | Primary key |
+| `message_id` | int FK → `messages.id` | Required, `ON DELETE CASCADE` |
+| `user_id` | int FK → `users.id` | Required, `ON DELETE RESTRICT`, indexed |
+| `status` | `DeliveryStatus` | Required; `SENT` / `DELIVERED` / `READ` |
+| `updated_at` | `UtcDateTime` | Required; advances on update |
+
+Decisions worth knowing:
+
+- **Deletion flows down, never sideways into accounts.** Deleting a
+  conversation deletes its messages, and deleting a message deletes its status
+  rows — a two-level cascade. Deleting a *user* does neither: both
+  `messages.sender_id` and `message_status.user_id` are `RESTRICT`, so the
+  database refuses rather than erasing what someone said in other people's
+  conversations. This matches `ConversationParticipant.user_id`.
+- **Account deletion remains unresolved**, and now has three tables blocking
+  it. A tombstone or soft-delete design is needed before real account deletion
+  can work; `User` was deliberately not changed here.
+- **`reply_to_id` is `SET NULL`, not `RESTRICT`.** A reply is history and must
+  outlive the message it answers, so the pointer is simply cleared. `RESTRICT`
+  would also have made any conversation containing a reply impossible to
+  delete, because the cascade would hit messages referencing each other —
+  verified against SQLite before choosing.
+- **`MessageStatus` uses a surrogate primary key with a unique constraint on
+  `(message_id, user_id)`**, unlike `Contact` and `ConversationParticipant`,
+  which use composite primary keys. Those are pure associations that nothing
+  references, so the pair is their identity. A status row is a mutable entity
+  with its own lifecycle, so a single-column key keeps it addressable; the
+  unique constraint supplies the same duplicate protection.
+- **`last_read_message_id` stays a plain integer.** Now that `messages` exists
+  the foreign key *could* be added, but doing so is its own migration and its
+  own decision, not a side effect of this stage. A retargeted test guards that.
+- **Message history is ordered by `created_at`**, and the composite index
+  `(conversation_id, created_at)` serves the whole query
+  `WHERE conversation_id = ? ORDER BY created_at` — filter and sort together.
+  A plain `conversation_id` index would leave a sort behind it.
+- **Other indexes**: `sender_id` and `message_status.user_id` back the
+  `RESTRICT` checks, which otherwise scan the whole table on every user
+  deletion; `reply_to_id` backs both the `replies` relationship and the
+  `SET NULL` sweep when a message is deleted. No speculative indexes.
+- **Rules the model does not enforce**: empty content, edit permissions,
+  expiry, and status progression (nothing stops `READ` going back to `SENT`).
+  All service-layer concerns.
+
+## A02 summary: the finished data model
+
+Six tables, audited end to end at the close of A02.
+
+### Data ownership
+
+Ownership decides deletion, and it flows in one direction only:
+
+```
+Conversation ──owns──> ConversationParticipant
+             └─owns──> Message ──owns──> MessageStatus
+
+User ────────references, never owns────> everything above
+```
+
+- A **conversation owns** its participants and messages; deleting it removes
+  them, and removing a message removes its status rows in turn.
+- A **message owns** its status rows.
+- A **user owns nothing**. Accounts reference history; they do not contain it.
+  Deleting a user therefore cannot delete a message.
+
+Contacts are the exception that proves the rule: they cascade from `users`
+because a contact link is not history — it is one person's private address
+book entry, meaningless once either side is gone.
+
+Every foreign key has an explicit rule; none falls back to the default, and a
+test pins the whole set.
+
+### Direct conversations
+
+One `Conversation` model covers both kinds, split by `ConversationType`.
+
+- **DIRECT uniqueness is a service-layer invariant.** Participants live in a
+  child table, so no column constraint can express "this pair already has a
+  direct conversation". Solved with triggers, pair hashes or a `pair_key`
+  column it would leak denormalised state into the schema; the normalised
+  structure is kept instead.
+- **There is a concurrency hazard to solve when `ConversationService` is
+  built.** Two simultaneous requests can both query, both see no existing
+  direct conversation, and both create one. A check-then-insert is not enough:
+  the service needs a unique key it can insert against, a serialisable
+  transaction, or an application lock — decided when that service exists.
+- **The database does not enforce the participant count.** A DIRECT
+  conversation with three participants is accepted today; a test records that.
+
+### Groups
+
+- Groups may hold any number of participants.
+- `ParticipantRole` is `MEMBER` or `ADMIN`, structural only.
+- **Exactly-one-admin, and who may add or remove members, are service-layer
+  rules.** Nothing stops every admin being demoted; a test records that too.
+
+### Read state
+
+- `MessageStatus` is per-message, per-user delivery state, unique on
+  `(message_id, user_id)`.
+- **Status progression is not enforced.** The column stores state, so
+  `READ → SENT` is accepted by the database. Monotonic progression belongs to
+  the message and WebSocket services.
+- `ConversationParticipant.last_read_message_id` **remains a nullable integer
+  with no foreign key**, deliberately, even though `messages` now exists.
+  Adding the reference is its own migration and its own decision — it also
+  introduces a `conversation_participants → messages → conversations`
+  dependency that table-drop ordering must then respect. It should land with
+  the read-state service logic that gives it meaning, not before.
+
+### Account deletion
+
+**Account deletion/tombstoning is intentionally unresolved and must be
+designed before production account deletion is implemented.**
+
+Three tables reference `users` with `RESTRICT` — `conversation_participants`,
+`messages`, `message_status` — so an account carrying any history cannot
+currently be deleted at all. That is the deliberate default: fail loudly
+rather than erase what somebody said in other people's conversations. It is
+not a complete answer. A tombstone, soft delete or anonymisation design is
+needed, and it is a product decision as much as a technical one. Nothing here
+adds `deleted_at`, tombstone users, anonymisation or purge jobs.
+
+### Replies
+
+`Message.reply_to_id` is a nullable self-reference with `ON DELETE SET NULL`.
+Deleting a referenced message clears the pointer and leaves the reply — and
+everything further down the chain — intact.
+
+### Realtime state is not in the database
+
+Typing indicators, online presence and WebSocket connection state are
+**ephemeral** and are deliberately not database entities. They change many
+times a second, are meaningless after a disconnect, and would turn every
+keystroke into a write. They belong in connection state or a cache.
+
+`User.is_online` and `User.last_seen` are the one deliberate exception: a
+*persisted summary* that survives a restart so a client has something to show
+before any live signal arrives. They are written by services, never by the
+model.

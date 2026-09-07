@@ -14,10 +14,24 @@ To add a model in a later stage:
 Alembic imports this package in ``alembic/env.py`` before reading
 ``Base.metadata``, so step 2 is what makes a new table visible to migrations.
 
-No application models exist yet; they are introduced in A02.
 """
 
-# Model imports go here, e.g.:
-#     from app.models.user import User
+from app.models.contact import Contact
+from app.models.conversation import Conversation, ConversationType
+from app.models.conversation_participant import ConversationParticipant, ParticipantRole
+from app.models.message import Message, MessageType
+from app.models.message_status import DeliveryStatus, MessageStatus
+from app.models.user import User
 
-__all__: list[str] = []
+__all__ = [
+    "Contact",
+    "Conversation",
+    "ConversationParticipant",
+    "ConversationType",
+    "DeliveryStatus",
+    "Message",
+    "MessageStatus",
+    "MessageType",
+    "ParticipantRole",
+    "User",
+]
