@@ -70,10 +70,11 @@ sender_id: Mapped[int] = mapped_column(
 )
 ```
 
-Note that SQLite does **not** enforce foreign keys unless `PRAGMA foreign_keys=ON`
-is set per connection. That pragma is not enabled yet; enable it when the first
-real foreign key lands, otherwise `ondelete` is silently inert in development
-while behaving differently on PostgreSQL.
+SQLite does not enforce foreign keys unless `PRAGMA foreign_keys=ON` is set per
+connection. This is now enabled for every SQLite connection by the engine
+factory in `app/database/database.py`, so `ondelete` behaves in development the
+way it will on PostgreSQL. Model tests get the same enforcement, because they
+build their engine through that same factory.
 
 ## Relationships
 
