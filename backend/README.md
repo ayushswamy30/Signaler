@@ -41,6 +41,9 @@ uvicorn app.main:app --reload    # http://127.0.0.1:8000/api/health
 pytest
 ```
 
+91 tests: the health endpoint, metadata and migration wiring, the test-database
+and foreign-key infrastructure, and the four models' database behaviour.
+
 ## Testing against the database
 
 Model tests use a temporary SQLite file, created per test and thrown away
@@ -83,9 +86,44 @@ def test_via_the_api(client):        # routes get the temporary database
 
 ## Models
 
-Conventions for ORM models — the single declarative `Base`, how a model is
-registered so Alembic can see it, and the timestamp, enum, and relationship
-rules — are in [docs/model-conventions.md](docs/model-conventions.md).
+Four tables exist so far. Full reasoning for each — nullability, uniqueness,
+deletion semantics, and which rules are deliberately left to the service layer
+— is in [docs/model-conventions.md](docs/model-conventions.md).
+
+| Table | Key | Purpose |
+| --- | --- | --- |
+| `users` | `id` | Accounts: unique username, optional-but-unique phone number, password hash, presence |
+| `contacts` | `(user_id, contact_user_id)` | A directed saved link between two users |
+| `conversations` | `id` | Direct and group conversations, split by a `ConversationType` enum |
+| `conversation_participants` | `(conversation_id, user_id)` | Membership, carrying role, join time and read position |
+
+Shared machinery lives in `app/models/`: `Base` (in `app/database/database.py`)
+with its constraint naming convention, `TimestampMixin`, the `UtcDateTime`
+column type, and the `sa_enum()` helper.
+
+Not yet built: `Message`, `MessageStatus`, authentication, services, and any
+API beyond `/api/health`.
+
+### Adding a model
+
+A model attaches to `Base.metadata` only when its module is imported, so
+registration is two steps and the second is easy to forget:
+
+1. Create `app/models/<name>.py` with a class inheriting from `Base`.
+2. Import it in `app/models/__init__.py` and add it to `__all__`.
+
+**A model missing from step 2 is invisible to autogenerate, which then produces
+an empty migration with no error.** Tests in `tests/test_metadata.py` guard
+against exactly that.
+
+Then generate the migration, read it, and apply it — see below.
+
+## Continuous integration
+
+`.github/workflows/backend.yml` runs on every pull request and on pushes to
+`main`: it installs `requirements.txt` on Python 3.11, runs `pytest`, applies
+the migrations, and then runs `alembic check` so the build fails if the models
+and migrations have drifted apart.
 
 ## Database migrations
 
