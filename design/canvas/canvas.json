@@ -1,0 +1,264 @@
+{
+  "artboards": [
+    {
+      "file": "DesignSystem.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1560,
+      "h": 2040,
+      "page": "system"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "app"
+    },
+    {
+      "file": "Empty.dc.html",
+      "x": 1390,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "app"
+    },
+    {
+      "file": "Unread.dc.html",
+      "x": 2780,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "app"
+    },
+    {
+      "file": "Typing.dc.html",
+      "x": 0,
+      "y": 950,
+      "w": 1280,
+      "h": 800,
+      "page": "app"
+    },
+    {
+      "file": "Reply.dc.html",
+      "x": 1390,
+      "y": 950,
+      "w": 1280,
+      "h": 800,
+      "page": "app"
+    },
+    {
+      "file": "GroupChat.dc.html",
+      "x": 2780,
+      "y": 950,
+      "w": 1280,
+      "h": 800,
+      "page": "app"
+    },
+    {
+      "file": "Login.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "auth"
+    },
+    {
+      "file": "Registration.dc.html",
+      "x": 1390,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "auth"
+    },
+    {
+      "file": "OTP.dc.html",
+      "x": 2780,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "auth"
+    },
+    {
+      "file": "Loading.dc.html",
+      "x": 0,
+      "y": 950,
+      "w": 1280,
+      "h": 800,
+      "page": "auth"
+    },
+    {
+      "file": "Error.dc.html",
+      "x": 1390,
+      "y": 950,
+      "w": 1280,
+      "h": 800,
+      "page": "auth"
+    },
+    {
+      "file": "NewMessage.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "panels"
+    },
+    {
+      "file": "ContactSearch.dc.html",
+      "x": 1390,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "panels"
+    },
+    {
+      "file": "CreateGroup.dc.html",
+      "x": 2780,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "panels"
+    },
+    {
+      "file": "GroupInfo.dc.html",
+      "x": 0,
+      "y": 950,
+      "w": 1280,
+      "h": 800,
+      "page": "panels"
+    },
+    {
+      "file": "Settings.dc.html",
+      "x": 1390,
+      "y": 950,
+      "w": 1280,
+      "h": 800,
+      "page": "panels"
+    },
+    {
+      "file": "Profile.dc.html",
+      "x": 2780,
+      "y": 950,
+      "w": 1280,
+      "h": 800,
+      "page": "panels"
+    },
+    {
+      "file": "MobileList.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "mobile"
+    },
+    {
+      "file": "MobileChat.dc.html",
+      "x": 500,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "page": "mobile"
+    },
+    {
+      "file": "DarkChat.dc.html",
+      "x": 1000,
+      "y": 0,
+      "w": 1280,
+      "h": 800,
+      "page": "mobile"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "n-app",
+      "page": "app",
+      "x": 0,
+      "y": -150,
+      "w": 900,
+      "text": "APP SHELL \u2014 the six states of the main screen.\nDirect chat is the entry artboard. Unread shows the divider, the count badge and the jump-to-new pill. Typing, Reply and Group cover the remaining live states."
+    },
+    {
+      "id": "n-app2",
+      "page": "app",
+      "x": 2780,
+      "y": 1770,
+      "w": 900,
+      "text": "Message grouping: consecutive messages from one sender share a bubble stack \u2014 only the last carries the timestamp and delivery tick, and the corner nearest the sender collapses from 14px to 4px."
+    },
+    {
+      "id": "n-auth",
+      "page": "auth",
+      "x": 0,
+      "y": -150,
+      "w": 900,
+      "text": "AUTH + SYSTEM STATES.\nLogin and OTP are drawn in their error states, since those are the ones that get skipped in implementation. Loading is skeletons, never a spinner over an empty page. Error is inline and recoverable \u2014 no full-screen error."
+    },
+    {
+      "id": "n-panels",
+      "page": "panels",
+      "x": 0,
+      "y": -150,
+      "w": 900,
+      "text": "MODALS & PANELS.\nCreate group shows steps 1 and 2 side by side so the flow reads in one view. Group info is admin-facing: Add member and the per-member menu are hidden from regular members."
+    },
+    {
+      "id": "n-panels2",
+      "page": "panels",
+      "x": 1390,
+      "y": 1770,
+      "w": 900,
+      "text": "Settings marks Privacy, Notifications, Calls and Linked devices as Placeholder \u2014 present so navigation is complete, explicitly out of scope for this build."
+    },
+    {
+      "id": "n-mobile",
+      "page": "mobile",
+      "x": 0,
+      "y": -150,
+      "w": 1100,
+      "text": "MOBILE + DARK.\nMobile is list \u2192 chat with back navigation; every hit target is at least 44px. No fake status bar or keyboard is drawn \u2014 the real ones render on top.\nDark mode uses the same token names as light, so components retheme by swapping the collection rather than being redrawn."
+    },
+    {
+      "id": "n-system",
+      "page": "system",
+      "x": 1650,
+      "y": 0,
+      "w": 460,
+      "text": "Every component here is built from design/design-tokens.md.\n\nThe delivery-status row is the one to check first: sent, delivered, read and failed each have a distinct glyph, so status survives greyscale and colour-blindness (brief \u00a76, \u00a719)."
+    },
+    {
+      "id": "n-system2",
+      "page": "system",
+      "x": 1650,
+      "y": 380,
+      "w": 460,
+      "text": "Not enforced by the UI, by design: direct-conversation uniqueness, group admin rules and message status progression are service-layer invariants. The screens show the states; they don't police them."
+    }
+  ],
+  "pages": [
+    {
+      "id": "app",
+      "name": "App shell"
+    },
+    {
+      "id": "auth",
+      "name": "Auth & states"
+    },
+    {
+      "id": "panels",
+      "name": "Modals & panels"
+    },
+    {
+      "id": "mobile",
+      "name": "Mobile & dark"
+    },
+    {
+      "id": "system",
+      "name": "Design system"
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "app"
+  }
+}

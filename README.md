@@ -18,7 +18,7 @@ authentication and real-time delivery come in later stages.
 | Models: `Message`, `MessageStatus` | Done |
 | Database hardening: FK/index audit, cross-model integration tests | Done |
 | Authentication, services, API endpoints, WebSockets | Not started |
-| UI/UX design — design tokens + Figma foundations | In progress |
+| UI/UX design — tokens, design system, 21 screens | Done |
 | Frontend (Next.js) | Not started |
 
 149 tests pass; CI runs them on every pull request.
@@ -63,8 +63,9 @@ uvicorn app.main:app --reload # http://127.0.0.1:8000/api/health
 pytest
 ```
 
-Design tokens for the frontend are specified in
-[design/design-tokens.md](design/design-tokens.md).
+The frontend design lives in [design/](design/): token spec in
+[design-tokens.md](design/design-tokens.md), and the design system plus 21 screens
+as a canvas built from [design/canvas/](design/canvas/).
 
 Full backend documentation — configuration, migration commands, and how tests
 get a database — is in [backend/README.md](backend/README.md). Schema decisions
