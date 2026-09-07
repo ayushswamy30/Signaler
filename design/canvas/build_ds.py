@@ -40,9 +40,7 @@ def btn(variant, state, label="Button", loading=False):
     }[(variant, state)]
     bg, fg, bd = looks
     border = f"border:1px solid {bd};" if bd else "border:1px solid transparent;"
-    focus = ""
-    if state == "Focus":
-        focus = f"box-shadow:0 0 0 2px {T['surface']},0 0 0 4px {T['accent']};"
+    focus = ""  # the focus ring is rendered separately, see focus_btn
     spin = ("" if not loading else
             f'<span style="width:14px;height:14px;border-radius:999px;border:2px solid '
             f'{"rgba(255,255,255,.45)" if fg == "#fff" else T["text3"]};'
@@ -58,12 +56,6 @@ for v in ["Primary", "Secondary", "Ghost", "Danger"]:
                     f'{btn(v, s)}</div>' for s in ["Default", "Hover", "Disabled"])
     btn_grid += (f'<div class="c" style="gap:9px;"><span class="t13 w6">{v}</span>'
                  f'<div class="r" style="gap:16px;">{cells}</div></div>')
-btn_extra = (f'<div class="r" style="gap:16px;">'
-             f'<div class="c" style="gap:7px;align-items:flex-start;">{lbl("FOCUS")}'
-             f'{btn("Primary","Focus" if False else "Default")}'
-             f'</div>'
-             f'<div class="c" style="gap:7px;align-items:flex-start;">{lbl("LOADING")}'
-             f'{btn("Primary","Default","Sending",loading=True)}</div></div>')
 focus_btn = (f'<span style="display:inline-flex;align-items:center;justify-content:center;'
              f'height:40px;padding:0 16px;border-radius:8px;background:{T["accent"]};color:#fff;'
              f'box-shadow:0 0 0 2px {T["surface"]},0 0 0 4px {T["accent"]};font-size:13px;'
