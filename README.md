@@ -18,7 +18,8 @@ authentication and real-time delivery come in later stages.
 | Models: `Message`, `MessageStatus` | Done |
 | Database hardening: FK/index audit, cross-model integration tests | Done |
 | Authentication, services, API endpoints, WebSockets | Not started |
-| Frontend (Next.js) | Not started |
+| UI/UX design — tokens, design system, 21 screens | Done |
+| Frontend (Next.js + TypeScript) — app shell, auth, settings, dark mode | Done |
 
 149 tests pass; CI runs them on every pull request.
 
@@ -26,11 +27,15 @@ authentication and real-time delivery come in later stages.
 
 - **Backend** — Python 3.11, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic, pytest
 - **Database** — SQLite (the schema is written to stay portable to PostgreSQL)
-- **Frontend** — Next.js (planned)
+- **Frontend** — Next.js 15 (App Router), TypeScript, Tailwind CSS
 
 ## Layout
 
 ```
+frontend/
+  src/app/        routes: chat, login, register, verify, settings
+  src/components/ Avatar, Button, Field, MessageBubble, Composer, Sidebar, Modal
+  src/lib/        types, sample data, helpers
 backend/
   app/
     main.py       application setup: CORS, router mounting
@@ -61,6 +66,10 @@ alembic upgrade head          # nothing creates the schema at startup
 uvicorn app.main:app --reload # http://127.0.0.1:8000/api/health
 pytest
 ```
+
+The frontend design lives in [design/](design/): token spec in
+[design-tokens.md](design/design-tokens.md), and the design system plus 21 screens
+as a canvas built from [design/canvas/](design/canvas/).
 
 Full backend documentation — configuration, migration commands, and how tests
 get a database — is in [backend/README.md](backend/README.md). Schema decisions

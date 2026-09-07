@@ -14,3 +14,6 @@ venv/
 
 # OS
 .DS_Store
+
+# Generated design canvas (rebuild: design/canvas/README.md)
+design/canvas/signaler-ui-design.html

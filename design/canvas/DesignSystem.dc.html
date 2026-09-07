@@ -1,0 +1,334 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: #F7F8FA; color: #141A21;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #2C6BED; text-decoration: none; }
+    a:hover { color: #1E55C9; }
+    .r { display: flex; align-items: center; }
+    .c { display: flex; flex-direction: column; }
+    .g { flex-grow: 1; }
+    .t11 { font-size: 11px; line-height: 16px; }
+    .t12 { font-size: 12px; line-height: 16px; }
+    .t13 { font-size: 13px; line-height: 18px; }
+    .t14 { font-size: 14px; line-height: 20px; }
+    .t16 { font-size: 16px; line-height: 24px; }
+    .t20 { font-size: 20px; line-height: 28px; }
+    .t24 { font-size: 24px; line-height: 32px; }
+    .t32 { font-size: 32px; line-height: 40px; }
+    .w4 { font-weight: 400; } .w5 { font-weight: 500; }
+    .w6 { font-weight: 600; } .w7 { font-weight: 700; }
+    .dim { color: #6B7683; } .dim2 { color: #9AA4B2; }
+    .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</helmet>
+<div class="c" style="width:1560px;min-height:2040px;background:#F7F8FA;
+     padding:44px;gap:30px;">
+  <div class="c" style="gap:7px;">
+    <span class="t32 w7" style="letter-spacing:-.6px;">Signaler design system</span>
+    <span class="t16 dim" style="max-width:760px;">Every component below is built from the tokens
+      in <span class="w6" style="color:#141A21;">design/design-tokens.md</span>. Nothing here
+      hardcodes a colour, radius or type size.</span>
+  </div>
+
+  <div class="r" style="gap:26px;align-items:flex-start;">
+    <div class="c g" style="gap:26px;">
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Buttons</span><span class="t13 dim">Four variants across three states, plus focus and loading.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="c" style="gap:20px;"><div class="c" style="gap:9px;"><span class="t13 w6">Primary</span><div class="r" style="gap:16px;"><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Default</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#2C6BED;color:#fff;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Hover</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#1E55C9;color:#fff;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Disabled</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#E1E5EB;color:#9AA4B2;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div></div></div><div class="c" style="gap:9px;"><span class="t13 w6">Secondary</span><div class="r" style="gap:16px;"><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Default</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#FFFFFF;color:#141A21;border:1px solid #E1E5EB;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Hover</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#EEF0F4;color:#141A21;border:1px solid #C9D0DA;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Disabled</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#FFFFFF;color:#9AA4B2;border:1px solid #EEF0F4;font-size:13px;font-weight:500;">Button</span></div></div></div><div class="c" style="gap:9px;"><span class="t13 w6">Ghost</span><div class="r" style="gap:16px;"><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Default</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:transparent;color:#6B7683;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Hover</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#EEF0F4;color:#141A21;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Disabled</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:transparent;color:#9AA4B2;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div></div></div><div class="c" style="gap:9px;"><span class="t13 w6">Danger</span><div class="r" style="gap:16px;"><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Default</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#D93A3A;color:#fff;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Hover</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#B32B2B;color:#fff;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">Disabled</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#E1E5EB;color:#9AA4B2;border:1px solid transparent;font-size:13px;font-weight:500;">Button</span></div></div></div><div class="r" style="gap:22px;"><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">FOCUS RING</span><span style="display:inline-flex;align-items:center;justify-content:center;height:40px;padding:0 16px;border-radius:8px;background:#2C6BED;color:#fff;box-shadow:0 0 0 2px #FFFFFF,0 0 0 4px #2C6BED;font-size:13px;font-weight:500;">Button</span></div><div class="c" style="gap:7px;align-items:flex-start;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">LOADING</span><span style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;background:#2C6BED;color:#fff;border:1px solid transparent;font-size:13px;font-weight:500;"><span style="width:14px;height:14px;border-radius:999px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;"></span>Sending</span></div></div></div></div>
+</div>
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Inputs</span><span class="t13 dim">Error text always accompanies the error colour.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="r" style="gap:20px;flex-wrap:wrap;"><div class="c" style="gap:6px;width:230px;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">DEFAULT</span>
+  <span class="t13 w5">Username</span>
+  <div class="r" style="gap:10px;height:40px;padding:0 13px;border-radius:8px;
+    background:#FFFFFF;border:1px solid #E1E5EB;">
+    <span class="t14 g" style="color:#9AA4B2;">Enter a username</span>
+  </div>
+  <div class="r t12" style="gap:5px;color:#6B7683;">We never share this.</div>
+</div><div class="c" style="gap:6px;width:230px;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">FOCUS</span>
+  <span class="t13 w5">Username</span>
+  <div class="r" style="gap:10px;height:40px;padding:0 13px;border-radius:8px;
+    background:#FFFFFF;border:2px solid #2C6BED;">
+    <span class="t14 g" style="color:#141A21;">ayush</span><span style="width:1.5px;height:18px;background:#2C6BED;"></span>
+  </div>
+  <div class="r t12" style="gap:5px;color:#6B7683;">We never share this.</div>
+</div><div class="c" style="gap:6px;width:230px;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">ERROR</span>
+  <span class="t13 w5">Username</span>
+  <div class="r" style="gap:10px;height:40px;padding:0 13px;border-radius:8px;
+    background:#FFFFFF;border:2px solid #D93A3A;">
+    <span class="t14 g" style="color:#141A21;">ayush</span>
+  </div>
+  <div class="r t12" style="gap:5px;color:#D93A3A;"><span style="display:flex;color:#D93A3A;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5L21 19H3z"/><path d="M12 10v4M12 16.6v.1"/></svg></span>That username is already taken.</div>
+</div><div class="c" style="gap:6px;width:230px;opacity:.65;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">DISABLED</span>
+  <span class="t13 w5">Username</span>
+  <div class="r" style="gap:10px;height:40px;padding:0 13px;border-radius:8px;
+    background:#EEF0F4;border:1px solid #EEF0F4;">
+    <span class="t14 g" style="color:#9AA4B2;">ayush</span>
+  </div>
+  <div class="r t12" style="gap:5px;color:#9AA4B2;">Unavailable right now.</div>
+</div></div></div>
+</div>
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Message bubbles</span><span class="t13 dim">Grouping, reply quote, edited marker and delivery status.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="c" style="gap:6px;max-width:560px;"><div style="display:flex;justify-content:flex-start;">
+  <div style="max-width:460px;padding:8px 12px;border-radius:14px 14px 14px 4px;background:#EEF0F4;color:#141A21;">
+    
+    <div class="t14" style="white-space:pre-wrap;">Are we still on for dinner tonight?</div>
+    <div class="r" style="gap:5px;justify-content:flex-end;margin-top:2px;">
+      <span class="t11" style="color:#9AA4B2;">09:02</span>
+    </div>
+  </div>
+</div><div style="display:flex;justify-content:flex-end;">
+  <div style="max-width:460px;padding:8px 12px;border-radius:14px 14px 4px 14px;background:#2C6BED;color:#FFFFFF;">
+    
+    <div class="t14" style="white-space:pre-wrap;">Yes — 7pm at the usual place.</div>
+    <div class="r" style="gap:5px;justify-content:flex-end;margin-top:2px;">
+      <span class="t11" style="color:rgba(255,255,255,.75);">09:03</span><span style="display:flex;color:rgba(255,255,255,.75);"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    </div>
+  </div>
+</div><div style="display:flex;justify-content:flex-end;">
+  <div style="max-width:460px;padding:8px 12px;border-radius:14px 4px 4px 14px;background:#2C6BED;color:#FFFFFF;">
+    
+    <div class="t14" style="white-space:pre-wrap;">I booked a table.</div>
+    <div class="r" style="gap:5px;justify-content:flex-end;margin-top:2px;">
+      <span class="t11" style="color:rgba(255,255,255,.75);">09:03</span><span style="display:flex;color:rgba(255,255,255,.75);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12.5l4 4L14 8"/><path d="M10 15.5l1.5 1.5L21 7"/></svg></span>
+    </div>
+  </div>
+</div><div style="display:flex;justify-content:flex-end;">
+  <div style="max-width:460px;padding:8px 12px;border-radius:14px 4px 14px 14px;background:#2C6BED;color:#FFFFFF;">
+    
+    <div class="t14" style="white-space:pre-wrap;">Under my name.</div>
+    <div class="r" style="gap:5px;justify-content:flex-end;margin-top:2px;">
+      <span class="t11" style="color:rgba(255,255,255,.75);">edited</span><span class="t11" style="color:rgba(255,255,255,.75);">09:04</span><span style="display:flex;color:#FFFFFF;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12.5l4 4L14 8"/><path d="M10 15.5l1.5 1.5L21 7"/></svg></span>
+    </div>
+  </div>
+</div><div style="display:flex;justify-content:flex-start;">
+  <div style="max-width:460px;padding:8px 12px;border-radius:14px 14px 14px 4px;background:#EEF0F4;color:#141A21;">
+    <div style="display:flex;gap:8px;padding:6px 10px;margin-bottom:6px;
+     border-radius:6px;background:#E1E5EB;border-left:3px solid #2C6BED;">
+  <div class="c" style="min-width:0;gap:1px;">
+    <span class="t12 w6" style="color:#2C6BED;">You</span>
+    <span class="t12 ell" style="color:#6B7683;max-width:240px;">Yes — 7pm at the usual place.</span>
+  </div>
+</div>
+    <div class="t14" style="white-space:pre-wrap;">Perfect, see you then.</div>
+    <div class="r" style="gap:5px;justify-content:flex-end;margin-top:2px;">
+      <span class="t11" style="color:#9AA4B2;">09:06</span>
+    </div>
+  </div>
+</div><div style="display:flex;justify-content:flex-start;">
+  <div style="max-width:460px;padding:8px 12px;border-radius:14px 14px 14px 4px;background:#EEF0F4;color:#141A21;">
+    <div class="t12 w6" style="color:#2C6BED;margin-bottom:2px;">Maya Iyer</div>
+    <div class="t14" style="white-space:pre-wrap;">Pushed the new tokens.</div>
+    <div class="r" style="gap:5px;justify-content:flex-end;margin-top:2px;">
+      <span class="t11" style="color:#9AA4B2;">08:52</span>
+    </div>
+  </div>
+</div></div></div>
+</div>
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Delivery status</span><span class="t13 dim">Brief §6 and §19 — never colour alone.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="c" style="gap:12px;">
+  <div class="r" style="gap:26px;">
+    <div class="c" style="gap:6px;align-items:center;">
+      <span style="display:flex;color:#6B7683;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+      <span class="t12 w6">Sent</span><span class="t11 dim2">one tick</span></div>
+    <div class="c" style="gap:6px;align-items:center;">
+      <span style="display:flex;color:#6B7683;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12.5l4 4L14 8"/><path d="M10 15.5l1.5 1.5L21 7"/></svg></span>
+      <span class="t12 w6">Delivered</span><span class="t11 dim2">two ticks</span></div>
+    <div class="c" style="gap:6px;align-items:center;">
+      <span style="display:flex;color:#2C6BED;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12.5l4 4L14 8"/><path d="M10 15.5l1.5 1.5L21 7"/></svg></span>
+      <span class="t12 w6">Read</span><span class="t11 dim2">two ticks, heavier + accent</span></div>
+    <div class="c" style="gap:6px;align-items:center;">
+      <span style="display:flex;color:#D93A3A;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5L21 19H3z"/><path d="M12 10v4M12 16.6v.1"/></svg></span>
+      <span class="t12 w6">Failed</span><span class="t11 dim2">triangle + text</span></div>
+  </div>
+  <div class="r" style="gap:9px;padding:10px 12px;border-radius:8px;background:#EAF2FF;">
+    <span style="display:flex;color:#2C6BED;margin-top:1px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.1"/></svg></span>
+    <span class="t12" style="color:#2C6BED;">Status never relies on colour alone — each
+      state has a distinct glyph, so it survives greyscale and colour-blindness.</span>
+  </div>
+</div></div>
+</div>
+    </div>
+
+    <div class="c" style="width:520px;flex:0 0 520px;gap:26px;">
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Avatar</span><span class="t13 dim">With optional presence dot.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="r" style="gap:22px;align-items:flex-end;"><div class="c" style="gap:7px;align-items:center;"><span style="position:relative;flex:0 0 auto;width:24px;height:24px;border-radius:999px;background:#EAF2FF;color:#2C6BED;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:10px;letter-spacing:.2px;">AS</span><span class="t11 w6 dim2" style="letter-spacing:.4px;">24</span></div><div class="c" style="gap:7px;align-items:center;"><span style="position:relative;flex:0 0 auto;width:32px;height:32px;border-radius:999px;background:#EAF2FF;color:#2C6BED;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;letter-spacing:.2px;">AS<span style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:999px;background:#1E9E62;border:2px solid #FFFFFF;"></span></span><span class="t11 w6 dim2" style="letter-spacing:.4px;">32</span></div><div class="c" style="gap:7px;align-items:center;"><span style="position:relative;flex:0 0 auto;width:40px;height:40px;border-radius:999px;background:#EAF2FF;color:#2C6BED;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;letter-spacing:.2px;">AS<span style="position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:999px;background:#1E9E62;border:2px solid #FFFFFF;"></span></span><span class="t11 w6 dim2" style="letter-spacing:.4px;">40</span></div><div class="c" style="gap:7px;align-items:center;"><span style="position:relative;flex:0 0 auto;width:48px;height:48px;border-radius:999px;background:#EAF2FF;color:#2C6BED;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:16px;letter-spacing:.2px;">AS<span style="position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:999px;background:#1E9E62;border:2px solid #FFFFFF;"></span></span><span class="t11 w6 dim2" style="letter-spacing:.4px;">48</span></div><div class="c" style="gap:7px;align-items:center;"><span style="position:relative;flex:0 0 auto;width:64px;height:64px;border-radius:999px;background:#EAF2FF;color:#2C6BED;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;letter-spacing:.2px;">AS<span style="position:absolute;right:-1px;bottom:-1px;width:18px;height:18px;border-radius:999px;background:#1E9E62;border:2px solid #FFFFFF;"></span></span><span class="t11 w6 dim2" style="letter-spacing:.4px;">64</span></div></div></div>
+</div>
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Badges & chips</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="r" style="gap:20px;align-items:center;">
+  <div class="c" style="gap:7px;align-items:center;">
+    <span style="min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#2C6BED;
+      color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;
+      justify-content:center;">3</span><span class="t11 w6 dim2" style="letter-spacing:.4px;">UNREAD</span></div>
+  <div class="c" style="gap:7px;align-items:center;">
+    <span style="min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#2C6BED;
+      color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;
+      justify-content:center;">99+</span><span class="t11 w6 dim2" style="letter-spacing:.4px;">OVERFLOW</span></div>
+  <div class="c" style="gap:7px;align-items:center;">
+    <span style="display:flex;color:#9AA4B2;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 9a6 6 0 0 0-9.3-5"/><path d="M6 9c0 5-2 6-2 6h11"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/><path d="M3.5 3.5l17 17"/></svg></span><span class="t11 w6 dim2" style="letter-spacing:.4px;">MUTED</span></div>
+  <div class="c" style="gap:7px;align-items:center;">
+    <span class="t11 w6" style="padding:3px 9px;border-radius:999px;background:#EAF2FF;
+      color:#2C6BED;">Admin</span><span class="t11 w6 dim2" style="letter-spacing:.4px;">ROLE</span></div>
+</div></div>
+</div>
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Conversation item</span><span class="t13 dim">The sidebar row in each of its states.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="c" style="gap:14px;"><div class="c" style="gap:6px;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">DEFAULT</span><div style="width:320px;"><div class="r" style="gap:12px;padding:10px 12px;border-radius:10px;background:transparent;">
+  <span style="position:relative;flex:0 0 auto;width:44px;height:44px;border-radius:999px;background:#EEF0F4;color:#6B7683;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;letter-spacing:.2px;">PN</span>
+  <div class="c g" style="gap:2px;min-width:0;">
+    <div class="r" style="gap:6px;">
+      <span class="t14 ell" style="font-weight:500;">Priya Nair</span>
+      
+      <span class="g"></span>
+      <span class="t11" style="color:#9AA4B2;flex:0 0 auto;">09:24</span>
+    </div>
+    <div class="r" style="gap:8px;">
+      <span class="t13 ell g" style="color:#6B7683;font-weight:400;">See you at 7 then</span>
+      
+    </div>
+  </div>
+</div></div></div><div class="c" style="gap:6px;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">ACTIVE</span><div style="width:320px;"><div class="r" style="gap:12px;padding:10px 12px;border-radius:10px;background:#EAF2FF;">
+  <span style="position:relative;flex:0 0 auto;width:44px;height:44px;border-radius:999px;background:#FFFFFF;color:#6B7683;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;letter-spacing:.2px;">PN</span>
+  <div class="c g" style="gap:2px;min-width:0;">
+    <div class="r" style="gap:6px;">
+      <span class="t14 ell" style="font-weight:500;">Priya Nair</span>
+      
+      <span class="g"></span>
+      <span class="t11" style="color:#9AA4B2;flex:0 0 auto;">09:24</span>
+    </div>
+    <div class="r" style="gap:8px;">
+      <span class="t13 ell g" style="color:#6B7683;font-weight:400;">See you at 7 then</span>
+      
+    </div>
+  </div>
+</div></div></div><div class="c" style="gap:6px;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">UNREAD</span><div style="width:320px;"><div class="r" style="gap:12px;padding:10px 12px;border-radius:10px;background:transparent;">
+  <span style="position:relative;flex:0 0 auto;width:44px;height:44px;border-radius:999px;background:#EEF0F4;color:#6B7683;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;letter-spacing:.2px;">DG</span>
+  <div class="c g" style="gap:2px;min-width:0;">
+    <div class="r" style="gap:6px;">
+      <span class="t14 ell" style="font-weight:600;">Design Guild</span>
+      
+      <span class="g"></span>
+      <span class="t11" style="color:#9AA4B2;flex:0 0 auto;">08:55</span>
+    </div>
+    <div class="r" style="gap:8px;">
+      <span class="t13 ell g" style="color:#141A21;font-weight:500;">Maya: pushed the new tokens</span>
+      <span style="min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#2C6BED;color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;">3</span>
+    </div>
+  </div>
+</div></div></div><div class="c" style="gap:6px;"><span class="t11 w6 dim2" style="letter-spacing:.4px;">MUTED</span><div style="width:320px;"><div class="r" style="gap:12px;padding:10px 12px;border-radius:10px;background:transparent;">
+  <span style="position:relative;flex:0 0 auto;width:44px;height:44px;border-radius:999px;background:#EEF0F4;color:#6B7683;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;letter-spacing:.2px;">RM</span>
+  <div class="c g" style="gap:2px;min-width:0;">
+    <div class="r" style="gap:6px;">
+      <span class="t14 ell" style="font-weight:500;">Rohan Mehta</span>
+      <span style="color:#9AA4B2;display:flex;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 9a6 6 0 0 0-9.3-5"/><path d="M6 9c0 5-2 6-2 6h11"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/><path d="M3.5 3.5l17 17"/></svg></span>
+      <span class="g"></span>
+      <span class="t11" style="color:#9AA4B2;flex:0 0 auto;">Yesterday</span>
+    </div>
+    <div class="r" style="gap:8px;">
+      <span class="t13 ell g" style="color:#6B7683;font-weight:400;">Thanks, that helps</span>
+      
+    </div>
+  </div>
+</div></div></div></div></div>
+</div>
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Overlays</span><span class="t13 dim">Dropdown, tooltip and toasts.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="c" style="gap:18px;"><div class="r" style="gap:26px;align-items:flex-start;"><div class="c" style="width:210px;padding:6px;border-radius:10px;
+  background:#FFFFFF;border:1px solid #E1E5EB;box-shadow:0 4px 12px rgba(0,0,0,.10);">
+  <div class="r" style="gap:10px;padding:9px 10px;border-radius:7px;
+    background:transparent;">
+    <span style="display:flex;color:#6B7683;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.1"/></svg></span>
+    <span class="t13 w5">View contact</span></div><div class="r" style="gap:10px;padding:9px 10px;border-radius:7px;
+    background:#EEF0F4;">
+    <span style="display:flex;color:#6B7683;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 9a6 6 0 0 0-9.3-5"/><path d="M6 9c0 5-2 6-2 6h11"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/><path d="M3.5 3.5l17 17"/></svg></span>
+    <span class="t13 w5">Mute notifications</span></div><div class="r" style="gap:10px;padding:9px 10px;border-radius:7px;
+    background:transparent;">
+    <span style="display:flex;color:#6B7683;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="3.2"/><path d="M3 19a6 6 0 0 1 12 0"/><path d="M16.5 7.2a3 3 0 0 1 0 5.6M17 19a6 6 0 0 0-2-4.3"/></svg></span>
+    <span class="t13 w5">Add to group</span></div>
+  <div style="height:1px;background:#EEF0F4;margin:5px 0;"></div>
+  <div class="r" style="gap:10px;padding:9px 10px;border-radius:7px;color:#D93A3A;">
+    <span style="display:flex;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span><span class="t13 w5">Block</span></div>
+</div><div class="c" style="gap:8px;align-items:center;">
+  <span style="padding:6px 10px;border-radius:7px;background:#141A21;color:#fff;
+    font-size:12px;font-weight:500;">Start a video call</span>
+  <span style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+    border-top:5px solid #141A21;margin-top:-8px;"></span>
+  <span style="width:34px;height:34px;border-radius:8px;background:#EEF0F4;color:#6B7683;
+    display:flex;align-items:center;justify-content:center;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="12" height="12" rx="2.5"/><path d="M15 10.5l6-3.5v10l-6-3.5z"/></svg></span>
+</div></div><div class="c" style="gap:10px;"><div class="r" style="gap:10px;padding:11px 15px;border-radius:10px;
+  background:#141A21;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.18);">
+  <span style="display:flex;color:#3DBE84;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+  <span class="t13 w5">Group created</span></div><div class="r" style="gap:10px;padding:11px 15px;border-radius:10px;
+  background:#141A21;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.18);">
+  <span style="display:flex;color:#D98B0A;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5L21 19H3z"/><path d="M12 10v4M12 16.6v.1"/></svg></span>
+  <span class="t13 w5 g">Couldn't reach the server</span>
+  <span class="t12 w6" style="color:#2C6BED;">Retry</span></div></div></div></div>
+</div>
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Loading & empty</span><span class="t13 dim">Skeletons stand in for content; empty states propose a next action.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><div class="c" style="gap:20px;"><div class="r" style="gap:12px;width:300px;">
+  <span style="display:block;width:44px;height:44px;border-radius:999px;background:#EEF0F4;"></span><div class="c g" style="gap:7px;"><span style="display:block;width:60%;height:11px;border-radius:6px;background:#EEF0F4;"></span><span style="display:block;width:85%;height:10px;border-radius:6px;background:#EEF0F4;"></span></div></div><div style="height:1px;background:#EEF0F4;"></div><div class="c" style="align-items:center;gap:12px;padding:22px;text-align:center;
+  width:300px;">
+  <div style="width:64px;height:64px;border-radius:999px;background:#EAF2FF;
+    color:#2C6BED;display:flex;align-items:center;justify-content:center;">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="3.2"/><path d="M3 19a6 6 0 0 1 12 0"/><path d="M16.5 7.2a3 3 0 0 1 0 5.6M17 19a6 6 0 0 0-2-4.3"/></svg></div>
+  <div class="c" style="gap:4px;align-items:center;">
+    <span class="t16 w6">No contacts yet</span>
+    <span class="t13 dim">Search for someone by username to start your first conversation.</span>
+  </div>
+  <span style="display:flex;align-items:center;gap:8px;height:38px;padding:0 16px;border-radius:8px;
+    background:#2C6BED;color:#fff;font-size:13px;font-weight:500;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Find people</span>
+</div></div></div>
+</div>
+      <div class="c" style="gap:14px;">
+  <div class="c" style="gap:3px;"><span class="t16 w6">Component tree</span><span class="t13 dim">Brief §21.</span></div>
+  <div style="height:1px;background:#E1E5EB;"></div>
+  <div class="c" style="gap:16px;padding:20px;border-radius:12px;background:#FFFFFF;border:1px solid #E1E5EB;"><pre style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:19px;color:#6B7683;white-space:pre;">AppShell
+├── Sidebar
+│   ├── ProfileHeader   ├── SearchBar
+│   ├── ConversationList → ConversationItem
+│   └── NewMessageButton
+└── ChatPanel
+    ├── ChatHeader
+    ├── MessageList → DateSeparator, UnreadDivider,
+    │                  MessageBubble → ReplyPreview, MessageMeta
+    ├── TypingIndicator
+    └── MessageComposer
+
+Overlays   NewMessageModal · CreateGroupModal · GroupInfoPanel
+           SettingsPanel · Dropdown · Toast · Tooltip
+Primitives Avatar · Badge · Button · Input · Skeleton · Divider</pre></div>
+</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

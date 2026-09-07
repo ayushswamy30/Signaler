@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: #F7F8FA; color: #141A21;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #2C6BED; text-decoration: none; }
+    a:hover { color: #1E55C9; }
+    .r { display: flex; align-items: center; }
+    .c { display: flex; flex-direction: column; }
+    .g { flex-grow: 1; }
+    .t11 { font-size: 11px; line-height: 16px; }
+    .t12 { font-size: 12px; line-height: 16px; }
+    .t13 { font-size: 13px; line-height: 18px; }
+    .t14 { font-size: 14px; line-height: 20px; }
+    .t16 { font-size: 16px; line-height: 24px; }
+    .t20 { font-size: 20px; line-height: 28px; }
+    .t24 { font-size: 24px; line-height: 32px; }
+    .t32 { font-size: 32px; line-height: 40px; }
+    .w4 { font-weight: 400; } .w5 { font-weight: 500; }
+    .w6 { font-weight: 600; } .w7 { font-weight: 700; }
+    .dim { color: #6B7683; } .dim2 { color: #9AA4B2; }
+    .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</helmet>
+<div class="r" style="width:1280px;height:800px;background:#F7F8FA;
+     align-items:center;justify-content:center;">
+  <div class="c" style="width:400px;gap:24px;padding:36px;border-radius:16px;
+    background:#FFFFFF;border:1px solid #E1E5EB;
+    box-shadow:0 8px 24px rgba(0,0,0,.06);"><div class="r" style="gap:10px;">
+  <span style="width:28px;height:28px;border-radius:8px;background:#2C6BED;
+    color:#fff;display:flex;align-items:center;justify-content:center;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></span>
+  <span class="w7" style="font-size:24px;letter-spacing:-.4px;">Signaler</span>
+</div>
+<div class="c" style="gap:4px;">
+  <span class="t24 w6">Sign in</span>
+  <span class="t14 dim">Use the username and password you registered with.</span>
+</div>
+<div class="r" style="gap:10px;padding:11px 13px;border-radius:8px;background:#FBE3E3;
+  color:#B32B2B;align-items:flex-start;">
+  <span style="display:flex;margin-top:1px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5L21 19H3z"/><path d="M12 10v4M12 16.6v.1"/></svg></span>
+  <span class="t13 w5 g">That username and password don't match. Check both and try again.</span>
+</div>
+<div class="c" style="gap:16px;">
+  <div class="c" style="gap:6px;">
+  <span class="t13 w5">Username</span>
+  <div class="r" style="gap:10px;height:42px;padding:0 13px;border-radius:8px;
+    background:#FFFFFF;border:2px solid #D93A3A;">
+    <span class="t14 g" style="color:#141A21;">ayush</span>
+    
+  </div>
+</div>
+  <div class="c" style="gap:6px;">
+  <span class="t13 w5">Password</span>
+  <div class="r" style="gap:10px;height:42px;padding:0 13px;border-radius:8px;
+    background:#FFFFFF;border:2px solid #D93A3A;">
+    <span class="t14 g" style="color:#141A21;">••••••••</span>
+    
+  </div><div class="r t12" style="gap:5px;color:#D93A3A;margin-top:5px;"><span style="display:flex;color:#D93A3A;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5L21 19H3z"/><path d="M12 10v4M12 16.6v.1"/></svg></span>2 attempts left before a short cool-down.</div>
+</div>
+</div>
+<button style="all:unset;cursor:pointer;box-sizing:border-box;width:100%;height:42px;
+   border-radius:8px;background:#2C6BED;color:#fff;border:none;display:flex;align-items:center;
+   justify-content:center;gap:9px;font-size:13px;font-weight:500;">Sign in</button>
+<div class="r" style="gap:6px;justify-content:center;">
+  <span class="t13 dim">New here?</span><a class="t13 w5" href="#">Create an account</a>
+</div></div>
+</div>
+</x-dc>
+</body>
+</html>

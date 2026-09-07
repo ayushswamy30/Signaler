@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: #F7F8FA; color: #141A21;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: #2C6BED; text-decoration: none; }
+    a:hover { color: #1E55C9; }
+    .r { display: flex; align-items: center; }
+    .c { display: flex; flex-direction: column; }
+    .g { flex-grow: 1; }
+    .t11 { font-size: 11px; line-height: 16px; }
+    .t12 { font-size: 12px; line-height: 16px; }
+    .t13 { font-size: 13px; line-height: 18px; }
+    .t14 { font-size: 14px; line-height: 20px; }
+    .t16 { font-size: 16px; line-height: 24px; }
+    .t20 { font-size: 20px; line-height: 28px; }
+    .t24 { font-size: 24px; line-height: 32px; }
+    .t32 { font-size: 32px; line-height: 40px; }
+    .w4 { font-weight: 400; } .w5 { font-weight: 500; }
+    .w6 { font-weight: 600; } .w7 { font-weight: 700; }
+    .dim { color: #6B7683; } .dim2 { color: #9AA4B2; }
+    .ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</helmet>
+<div class="r" style="width:1280px;height:800px;background:#F7F8FA;
+     align-items:center;justify-content:center;">
+  <div class="c" style="width:420px;gap:24px;padding:36px;border-radius:16px;
+    background:#FFFFFF;border:1px solid #E1E5EB;
+    box-shadow:0 8px 24px rgba(0,0,0,.06);"><div class="r" style="gap:10px;">
+  <span style="width:28px;height:28px;border-radius:8px;background:#2C6BED;
+    color:#fff;display:flex;align-items:center;justify-content:center;">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 8 6 8-16-8z"/></svg></span>
+  <span class="w7" style="font-size:24px;letter-spacing:-.4px;">Signaler</span>
+</div>
+<div class="c" style="gap:4px;">
+  <span class="t24 w6">Verify your number</span>
+  <span class="t14 dim">We sent a 6-digit code to <span class="w6"
+    style="color:#141A21;">+91 98••• ••210</span>.</span>
+</div>
+<div class="r" style="gap:10px;">
+  <div style="width:48px;height:56px;border-radius:10px;background:#FFFFFF;border:1px solid #C9D0DA;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;">4</div><div style="width:48px;height:56px;border-radius:10px;background:#FFFFFF;border:1px solid #C9D0DA;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;">9</div><div style="width:48px;height:56px;border-radius:10px;background:#FFFFFF;border:1px solid #C9D0DA;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;">2</div><div style="width:48px;height:56px;border-radius:10px;background:#FFFFFF;border:1px solid #C9D0DA;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;">7</div>
+  <div style="width:48px;height:56px;border-radius:10px;background:#FFFFFF;border:2px solid #2C6BED;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;"><span style="width:1.5px;height:22px;background:#2C6BED;"></span></div><div style="width:48px;height:56px;border-radius:10px;background:#FFFFFF;border:1px solid #E1E5EB;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;"></div>
+</div>
+<div class="r" style="gap:8px;padding:10px 13px;border-radius:8px;background:#FBE3E3;color:#B32B2B;">
+  <span style="display:flex;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5L21 19H3z"/><path d="M12 10v4M12 16.6v.1"/></svg></span>
+  <span class="t13 w5">That code has expired. Request a new one below.</span>
+</div>
+<button style="all:unset;cursor:pointer;box-sizing:border-box;width:100%;height:42px;
+   border-radius:8px;background:#2C6BED;color:#fff;border:none;display:flex;align-items:center;
+   justify-content:center;gap:9px;font-size:13px;font-weight:500;">Verify</button>
+<div class="r" style="gap:6px;justify-content:center;">
+  <span class="t13 dim">Didn't get it?</span>
+  <a class="t13 w5" href="#">Resend code</a>
+  <span class="t13 dim2">· in 0:24</span>
+</div></div>
+</div>
+</x-dc>
+</body>
+</html>
