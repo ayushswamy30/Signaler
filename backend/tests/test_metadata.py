@@ -62,15 +62,16 @@ def test_registered_models_are_on_the_shared_metadata() -> None:
     a model added without being imported in app/models/__init__.py, or a table
     registered by accident, both show up here.
     """
-    assert set(Base.metadata.tables) == {"users"}
+    assert set(Base.metadata.tables) == {"users", "contacts"}
 
 
-def test_user_model_is_registered() -> None:
-    from app.models import User
+def test_models_are_registered() -> None:
+    from app.models import Contact, User
 
-    assert "User" in app.models.__all__
-    assert User.__tablename__ == "users"
-    assert User.__table__ is Base.metadata.tables["users"]
+    for model, table_name in ((User, "users"), (Contact, "contacts")):
+        assert model.__name__ in app.models.__all__
+        assert model.__tablename__ == table_name
+        assert model.__table__ is Base.metadata.tables[table_name]
 
 
 def test_migrations_match_the_models(migrated_engine: sa.Engine) -> None:

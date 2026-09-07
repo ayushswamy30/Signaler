@@ -1,13 +1,17 @@
 """The User model: a registered Signaler account."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.database import Base
 from app.models.mixins import TimestampMixin
 from app.models.types import UtcDateTime
+
+if TYPE_CHECKING:
+    from app.models.contact import Contact
 
 
 class User(TimestampMixin, Base):
@@ -44,6 +48,27 @@ class User(TimestampMixin, Base):
     # online or move their last-seen time.
     is_online: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_seen: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+    # Two separate relationships because contacts is directed and both of its
+    # foreign keys point at this table: "people I saved" and "people who saved
+    # me" are different sets and must not share a name.
+    #
+    # passive_deletes lets the database's ON DELETE CASCADE do the work. Without
+    # it SQLAlchemy would load these rows on delete and try to NULL their
+    # foreign keys, which is impossible here because they are primary-key
+    # columns.
+    contacts: Mapped[list["Contact"]] = relationship(
+        back_populates="owner",
+        foreign_keys="Contact.user_id",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    contact_of: Mapped[list["Contact"]] = relationship(
+        back_populates="contact_user",
+        foreign_keys="Contact.contact_user_id",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __repr__(self) -> str:
         return f"<User id={self.id} username={self.username!r}>"

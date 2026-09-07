@@ -186,3 +186,40 @@ Decisions worth knowing:
 - **Timestamps follow the existing convention**: `TimestampMixin` for
   `created_at` / `updated_at`, `UtcDateTime` for `last_seen`, all
   Python-generated, aware UTC, microsecond precision.
+
+### Contact (`app/models/contact.py`)
+
+A directed link: `user_id` has saved `contact_user_id` as a contact. A saving B
+says nothing about whether B has saved A — those are two independent rows.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `user_id` | int FK → `users.id` | Part of the primary key, `ON DELETE CASCADE` |
+| `contact_user_id` | int FK → `users.id` | Part of the primary key, `ON DELETE CASCADE` |
+| `created_at` | `UtcDateTime` | When the link was made |
+
+Decisions worth knowing:
+
+- **Composite primary key `(user_id, contact_user_id)`.** The pair *is* the
+  identity of the row, so a surrogate `id` would add a column and an index
+  without expressing anything. It also makes "A added B twice" a primary-key
+  violation, so no separate unique constraint is needed — adding one over the
+  same columns would only duplicate the index.
+- **No `updated_at`.** A contact row records that a link was made; it is not
+  edited afterwards, so `TimestampMixin` would add a column that never changes.
+  `created_at` uses the same `UtcDateTime` + `utcnow` convention the mixin does.
+- **Both foreign keys cascade on delete.** A contact row is meaningless once
+  either participant is gone, so deleting a user removes both the contacts they
+  saved and the contacts pointing at them. The cascade lives in the *database*,
+  not only in relationship configuration, so rows cannot survive a delete that
+  bypasses the ORM.
+- **Two relationships, deliberately distinct names.** `user.contacts` is the
+  people this user saved; `user.contact_of` is the rows where this user is the
+  saved contact. Both foreign keys point at `users.id`, so SQLAlchemy cannot
+  infer which one each relationship travels — `foreign_keys=` is required, not
+  optional. Both use `passive_deletes=True` so the database performs the
+  cascade rather than the ORM loading every row to delete it.
+- **Self-contact is an application rule, not a database invariant.** Nothing
+  stops `A → A` at the database level today; there is no CHECK constraint, and
+  the model test documents that honestly rather than implying a guard that does
+  not exist. The Contacts service must reject it when that layer is built.

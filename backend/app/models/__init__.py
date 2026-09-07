@@ -16,6 +16,7 @@ Alembic imports this package in ``alembic/env.py`` before reading
 
 """
 
+from app.models.contact import Contact
 from app.models.user import User
 
-__all__ = ["User"]
+__all__ = ["Contact", "User"]
