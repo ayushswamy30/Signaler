@@ -21,6 +21,7 @@ from app.models.conversation import Conversation, ConversationType
 from app.models.conversation_participant import ConversationParticipant, ParticipantRole
 from app.models.message import Message, MessageType
 from app.models.message_status import DeliveryStatus, MessageStatus
+from app.models.refresh_token import RefreshToken
 from app.models.user import User
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "MessageStatus",
     "MessageType",
     "ParticipantRole",
+    "RefreshToken",
     "User",
 ]

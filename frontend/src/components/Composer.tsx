@@ -1,23 +1,61 @@
 "use client";
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { clsx } from "@/lib/clsx";
 import { Icon } from "./Icon";
 import { Spinner } from "./Primitives";
 
-export function Composer({ onSend, replyTo, onCancelReply, disabled, error, onRetry }: {
+/** How long after the last keystroke the "still typing" signal stops.
+ *  Slightly under the receiver's own expiry, so the indicator is refreshed
+ *  rather than flickering off between words. */
+const TYPING_IDLE_MS = 3000;
+
+export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCancelReply,
+  disabled, error, onRetry }: {
   onSend: (text: string) => void;
+  /** Called when typing starts and again when it stops. */
+  onTyping?: (isTyping: boolean) => void;
+  /** Prefills the box — used to edit an existing message. */
+  initialValue?: string;
   replyTo?: { sender: string; content: string } | null;
   onCancelReply?: () => void;
   disabled?: boolean; error?: string | null; onRetry?: () => void;
 }) {
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue);
   const [sending, setSending] = useState(false);
   const canSend = value.trim().length > 0 && !disabled && !sending;
+
+  // Tracked in a ref rather than state: it changes on every keystroke and must
+  // not cause a render, and the timer callback needs the current value.
+  const typing = useRef(false);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function stopTyping() {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = null;
+    if (typing.current) {
+      typing.current = false;
+      onTyping?.(false);
+    }
+  }
+
+  function noteTyping() {
+    if (!typing.current) {
+      typing.current = true;
+      onTyping?.(true);
+    }
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(stopTyping, TYPING_IDLE_MS);
+  }
+
+  // Leaving the conversation, or the page, must clear the indicator for
+  // everyone else -- otherwise it hangs there until their own timeout.
+  useEffect(() => stopTyping, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function submit(e?: FormEvent) {
     e?.preventDefault();
     if (!canSend) return;
     setSending(true);
+    stopTyping();
     onSend(value.trim());
     setValue("");
     setSending(false);
@@ -25,6 +63,7 @@ export function Composer({ onSend, replyTo, onCancelReply, disabled, error, onRe
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void submit(); }
+    if (e.key === "Escape" && onCancelReply) onCancelReply();
   }
 
   return (
@@ -54,7 +93,7 @@ export function Composer({ onSend, replyTo, onCancelReply, disabled, error, onRe
           bg-hover px-lg py-[9px] focus-within:border-line-focus">
           <label htmlFor="composer" className="sr-only">Message</label>
           <textarea id="composer" rows={1} value={value} disabled={disabled}
-            onChange={(e) => setValue(e.target.value)} onKeyDown={onKeyDown}
+            onChange={(e) => { setValue(e.target.value); noteTyping(); }} onKeyDown={onKeyDown}
             placeholder="Message"
             className="max-h-[120px] flex-1 resize-none bg-transparent text-base outline-none
               placeholder:text-ink-faint" />

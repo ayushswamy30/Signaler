@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer
+from sqlalchemy import Boolean, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.database import Base
@@ -67,11 +67,16 @@ class ConversationParticipant(Base):
 
     joined_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow, nullable=False)
 
-    # Read state. Intentionally a bare integer with no foreign key: the
-    # messages table does not exist yet, and inventing a placeholder Message
-    # model to satisfy it would be worse than waiting. A migration adds the
-    # foreign key to messages.id when that model lands.
-    last_read_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Read state. SET NULL rather than CASCADE: if the message someone had
+    # read up to is deleted, the pointer is cleared (the conversation reads as
+    # fully unread) rather than the membership being destroyed.
+    last_read_message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # Per-member notification preference, not a property of the conversation:
+    # muting a group must not mute it for everyone else.
+    muted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     conversation: Mapped["Conversation"] = relationship(back_populates="participants")
     user: Mapped["User"] = relationship(back_populates="conversation_participations")

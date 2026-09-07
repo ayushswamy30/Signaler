@@ -6,7 +6,7 @@ real database. A test that built its schema with ``Base.metadata.create_all``
 would pass even if the migrations were broken or missing.
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
@@ -16,8 +16,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.config import settings
 from app.database.database import create_app_engine, get_db
 from app.main import app
+from app.models.user import User
+from app.services import auth_service, user_service
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -94,3 +97,71 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def fast_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hash with bcrypt's minimum work factor for the duration of the suite.
+
+    The production factor is deliberately slow; at four rounds a test that
+    registers a handful of accounts takes milliseconds instead of seconds.
+    Autouse because every fixture below creates users.
+    """
+    monkeypatch.setattr(settings, "bcrypt_rounds", 4)
+
+
+DEFAULT_PASSWORD = "correct-horse-battery"
+
+
+@pytest.fixture
+def make_user(db_session: Session) -> Callable[..., User]:
+    """Factory for registered accounts.
+
+    A factory rather than fixed fixtures: most tests need two or three users
+    whose relationships differ, and naming each combination would multiply
+    fixtures faster than tests.
+    """
+
+    def _make(username: str, *, display_name: str | None = None, password: str = DEFAULT_PASSWORD,
+              phone_number: str | None = None) -> User:
+        return user_service.create_user(
+            db_session,
+            username=username,
+            password=password,
+            display_name=display_name or username.title(),
+            phone_number=phone_number,
+        )
+
+    return _make
+
+
+@pytest.fixture
+def alice(make_user: Callable[..., User]) -> User:
+    return make_user("alice", display_name="Alice Anand")
+
+
+@pytest.fixture
+def bob(make_user: Callable[..., User]) -> User:
+    return make_user("bob", display_name="Bob Basu")
+
+
+@pytest.fixture
+def carol(make_user: Callable[..., User]) -> User:
+    return make_user("carol", display_name="Carol Chen")
+
+
+@pytest.fixture
+def authed(client: TestClient, db_session: Session) -> Callable[[User], TestClient]:
+    """Return a helper that signs a client in as a given user.
+
+    It mutates the shared client's default headers rather than building a new
+    one, because both must keep using the same database session -- two clients
+    would mean two identity maps over one connection.
+    """
+
+    def _as(user: User) -> TestClient:
+        session = auth_service.issue_session(db_session, user)
+        client.headers["Authorization"] = f"Bearer {session.access_token}"
+        return client
+
+    return _as

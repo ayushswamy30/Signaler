@@ -94,6 +94,7 @@ def test_registered_models_are_on_the_shared_metadata() -> None:
         "conversation_participants",
         "messages",
         "message_status",
+        "refresh_tokens",
     }
 
 
@@ -185,6 +186,8 @@ def test_the_index_set_is_exactly_what_the_audit_justified(
             # Backs the RESTRICT check.
             "ix_messages_sender_id",
         ],
+        # Every live session for one user, for revoke-all on password change.
+        "refresh_tokens": ["ix_refresh_tokens_user_id"],
         "users": [],
     }
 
@@ -211,6 +214,11 @@ def test_every_foreign_key_has_a_deliberate_delete_rule(
         ("contacts", "contact_user_id"): "CASCADE",
         ("conversation_participants", "conversation_id"): "CASCADE",
         ("conversation_participants", "user_id"): "RESTRICT",
+        # The read pointer is optional context: clear it, keep the membership.
+        ("conversation_participants", "last_read_message_id"): "SET NULL",
+        # A session is not history. An account that goes away takes its live
+        # sessions with it rather than being blocked by them.
+        ("refresh_tokens", "user_id"): "CASCADE",
         ("messages", "conversation_id"): "CASCADE",
         ("messages", "sender_id"): "RESTRICT",
         ("messages", "reply_to_id"): "SET NULL",

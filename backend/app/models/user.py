@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.database import Base
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.conversation_participant import ConversationParticipant
     from app.models.message import Message
     from app.models.message_status import MessageStatus
+    from app.models.refresh_token import RefreshToken
 
 
 class User(TimestampMixin, Base):
@@ -42,6 +43,9 @@ class User(TimestampMixin, Base):
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
+    # The short "about" line Signal shows under a profile. Free text, optional.
+    about: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     # Only ever a hash. Nothing here computes it, and a plaintext password must
     # never reach this column. Sized for any modern hash format.
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -51,6 +55,13 @@ class User(TimestampMixin, Base):
     # online or move their last-seen time.
     is_online: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_seen: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+    # Brute-force state, written only by the authentication service. The
+    # counter resets on a successful login; locked_until is set when it trips
+    # the configured threshold and is simply compared against "now" -- no
+    # background job is needed to clear it.
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
 
     # Two separate relationships because contacts is directed and both of its
     # foreign keys point at this table: "people I saved" and "people who saved
@@ -97,6 +108,14 @@ class User(TimestampMixin, Base):
     )
     message_statuses: Mapped[list["MessageStatus"]] = relationship(
         back_populates="user",
+        passive_deletes=True,
+    )
+
+    # Sessions, unlike history, are disposable: the foreign key cascades and so
+    # does the relationship, so deleting an account drops its live sessions.
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
         passive_deletes=True,
     )
 

@@ -7,5 +7,8 @@ pydantic-settings==2.7.0
 # Not imported directly, but pydantic-settings requires it for .env support:
 # without it app.core.config fails to import. Pinned here for reproducibility.
 python-dotenv==1.0.1
+bcrypt==4.2.1                # password hashing, used directly (no passlib shim)
+PyJWT==2.10.1                # access-token encoding/decoding
+websockets==14.1             # ASGI websocket protocol for uvicorn
 pytest==8.3.4
 httpx==0.28.1                # required by fastapi.testclient.TestClient

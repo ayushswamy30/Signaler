@@ -238,14 +238,22 @@ def test_migration_creates_the_expected_users_schema(migrated_engine: sa.Engine)
         "phone_number",
         "display_name",
         "avatar_url",
+        # The profile line shown under a name.
+        "about",
         "password_hash",
         "is_online",
         "last_seen",
+        # Brute-force state, written only by the authentication service.
+        "failed_login_attempts",
+        "locked_until",
         "created_at",
         "updated_at",
     }
 
     required = {"username", "display_name", "password_hash", "is_online",
+                # A counter with no value would be indistinguishable from zero
+                # failures, so it is NOT NULL with a default of 0.
+                "failed_login_attempts",
                 "created_at", "updated_at"}
     for name, column in columns.items():
         assert column["nullable"] is (name not in required | {"id"}), name

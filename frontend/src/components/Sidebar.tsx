@@ -4,12 +4,12 @@ import { clsx } from "@/lib/clsx";
 import { Icon } from "./Icon";
 import { Avatar, EmptyState, Skeleton } from "./Primitives";
 import { ConversationItem } from "./Chat";
-import { title } from "@/lib/mock";
-import type { Conversation } from "@/lib/types";
+import { preview, title } from "@/lib/format";
+import type { Conversation, Me } from "@/lib/types";
 
-export function Sidebar({ conversations, activeId, onSelect, onNewMessage, onSettings,
+export function Sidebar({ me, conversations, activeId, onSelect, onNewMessage, onSettings,
   loading = false, className }: {
-  conversations: Conversation[]; activeId: number | null;
+  me: Me; conversations: Conversation[]; activeId: number | null;
   onSelect: (id: number) => void; onNewMessage: () => void; onSettings: () => void;
   loading?: boolean; className?: string;
 }) {
@@ -18,17 +18,18 @@ export function Sidebar({ conversations, activeId, onSelect, onNewMessage, onSet
     const q = query.trim().toLowerCase();
     if (!q) return conversations;
     return conversations.filter((c) =>
-      title(c).toLowerCase().includes(q) || c.lastMessage.toLowerCase().includes(q));
-  }, [conversations, query]);
+      title(c, me.id).toLowerCase().includes(q) ||
+      preview(c, me.id).toLowerCase().includes(q));
+  }, [conversations, query, me.id]);
 
   return (
     <aside className={clsx("flex h-full w-full flex-col border-r border-line bg-sidebar md:w-[340px] md:shrink-0",
       className)}>
       <div className="flex items-center gap-md border-b border-line-subtle p-lg">
-        <Avatar name="Ayush Swamy" size={36} online accent />
+        <Avatar name={me.displayName} size={36} online accent />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-base font-semibold">Ayush Swamy</span>
-          <span className="text-xs text-ink-faint">@ayush</span>
+          <span className="truncate text-base font-semibold">{me.displayName}</span>
+          <span className="text-xs text-ink-faint">@{me.username}</span>
         </div>
         <button onClick={onNewMessage} aria-label="New message"
           className="inline-flex h-11 w-11 items-center justify-center rounded-md text-ink-muted
@@ -70,7 +71,7 @@ export function Sidebar({ conversations, activeId, onSelect, onNewMessage, onSet
               : "Start a conversation and it will show up here."} />
         ) : (
           filtered.map((c) => (
-            <ConversationItem key={c.id} conversation={c} active={c.id === activeId}
+            <ConversationItem key={c.id} conversation={c} meId={me.id} active={c.id === activeId}
               onSelect={() => onSelect(c.id)} />
           ))
         )}

@@ -3,7 +3,7 @@ import { clsx } from "@/lib/clsx";
 import { Icon } from "./Icon";
 import { Avatar, Badge } from "./Primitives";
 import type { Conversation, DeliveryStatus, Message } from "@/lib/types";
-import { counterpart, title } from "@/lib/mock";
+import { formatListTime, formatTime, preview, subtitle, title } from "@/lib/format";
 
 /** Status uses a distinct glyph per state — never colour alone (brief §6, §19). */
 export function MessageStatusIcon({ status, onAccent }: {
@@ -23,10 +23,10 @@ export function MessageStatusIcon({ status, onAccent }: {
   );
 }
 
-export function ConversationItem({ conversation, active, onSelect }: {
-  conversation: Conversation; active: boolean; onSelect: () => void;
+export function ConversationItem({ conversation, meId, active, onSelect }: {
+  conversation: Conversation; meId: number; active: boolean; onSelect: () => void;
 }) {
-  const name = title(conversation);
+  const name = title(conversation, meId);
   const unread = conversation.unreadCount > 0;
   return (
     <button onClick={onSelect} aria-current={active ? "true" : undefined}
@@ -38,11 +38,13 @@ export function ConversationItem({ conversation, active, onSelect }: {
           <span className={clsx("truncate text-base", unread ? "font-semibold" : "font-medium")}>{name}</span>
           {conversation.muted && <Icon name="mute" size={14} strokeWidth={1.7} className="text-ink-faint" />}
           <span className="flex-1" />
-          <span className="shrink-0 text-xs text-ink-faint">{conversation.lastActivity}</span>
+          <span className="shrink-0 text-xs text-ink-faint">
+            {formatListTime(conversation.lastActivity)}</span>
         </span>
         <span className="flex items-center gap-sm">
           <span className={clsx("flex-1 truncate text-md",
-            unread ? "font-medium text-ink" : "text-ink-muted")}>{conversation.lastMessage}</span>
+            unread ? "font-medium text-ink" : "text-ink-muted")}>
+            {preview(conversation, meId)}</span>
           <Badge count={conversation.unreadCount} />
         </span>
       </span>
@@ -78,7 +80,7 @@ export function MessageBubble({ message, mine, showSender, first, last }: {
         <p className={clsx("mt-[2px] flex items-center justify-end gap-[5px] text-xs",
           mine ? "text-white/75" : "text-ink-faint")}>
           {message.editedAt && <span>edited</span>}
-          <span>{message.createdAt}</span>
+          <span>{formatTime(message.createdAt)}</span>
           {mine && message.status && <MessageStatusIcon status={message.status} onAccent />}
         </p>
       </div>
@@ -121,20 +123,18 @@ export function TypingIndicator({ name }: { name: string }) {
   );
 }
 
-export function ChatHeader({ conversation, onOpenInfo }: {
-  conversation: Conversation; onOpenInfo: () => void;
+export function ChatHeader({ conversation, meId, onOpenInfo }: {
+  conversation: Conversation; meId: number; onOpenInfo: () => void;
 }) {
   const isGroup = conversation.type === "group";
-  const other = counterpart(conversation);
-  const online = isGroup ? false : other.isOnline;
-  const sub = isGroup
-    ? `${conversation.participants.length} members`
-    : online ? "Online" : `Last seen ${other.lastSeen ?? "recently"}`;
+  const online = !isGroup &&
+    conversation.participants.some((p) => p.user.id !== meId && p.user.isOnline);
+  const sub = subtitle(conversation, meId);
   return (
     <header className="flex items-center gap-md border-b border-line bg-surface px-xl py-md">
-      <Avatar name={title(conversation)} size={38} />
+      <Avatar name={title(conversation, meId)} size={38} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <h1 className="truncate text-lg font-semibold">{title(conversation)}</h1>
+        <h1 className="truncate text-lg font-semibold">{title(conversation, meId)}</h1>
         <p className="flex items-center gap-[6px] text-sm text-ink-muted">
           {online && <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-status-online" />}
           {sub}
