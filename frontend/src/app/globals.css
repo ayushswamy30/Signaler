@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Token values are the contract in design/design-tokens.md.
+   Light and dark share names, so components never branch on theme. */
+:root {
+  --color-bg-canvas: #F7F8FA;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-surface-raised: #FFFFFF;
+  --color-bg-sidebar: #FFFFFF;
+  --color-bg-hover: #EEF0F4;
+  --color-bg-active: #EAF2FF;
+  --color-bg-inverse: #141A21;
+  --color-bg-overlay: #141A21;
+
+  --color-text-primary: #141A21;
+  --color-text-secondary: #6B7683;
+  --color-text-tertiary: #9AA4B2;
+  --color-text-inverse: #FFFFFF;
+  --color-text-link: #1E55C9;
+  --color-text-danger: #D93A3A;
+  --color-text-on-accent: #FFFFFF;
+
+  --color-border-subtle: #EEF0F4;
+  --color-border-default: #E1E5EB;
+  --color-border-strong: #C9D0DA;
+  --color-border-focus: #2C6BED;
+
+  --color-accent-default: #2C6BED;
+  --color-accent-hover: #1E55C9;
+  --color-accent-pressed: #17429C;
+  --color-accent-subtle: #EAF2FF;
+
+  --color-bubble-outgoing-bg: #2C6BED;
+  --color-bubble-outgoing-text: #FFFFFF;
+  --color-bubble-incoming-bg: #EEF0F4;
+  --color-bubble-incoming-text: #141A21;
+  --color-bubble-quote-bg: #E1E5EB;
+  --color-bubble-quote-border: #2C6BED;
+
+  --color-status-online: #1E9E62;
+  --color-status-success: #1E9E62;
+  --color-status-danger: #D93A3A;
+  --color-status-warning: #D98B0A;
+  --color-status-unread-bg: #2C6BED;
+  --color-status-unread-text: #FFFFFF;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --color-bg-canvas: #0B0F14;
+  --color-bg-surface: #141A21;
+  --color-bg-surface-raised: #182029;
+  --color-bg-sidebar: #141A21;
+  --color-bg-hover: #182029;
+  --color-bg-active: #1F262F;
+  --color-bg-inverse: #FFFFFF;
+  --color-bg-overlay: #000000;
+
+  --color-text-primary: #F7F8FA;
+  --color-text-secondary: #9AA4B2;
+  --color-text-tertiary: #6B7683;
+  --color-text-inverse: #141A21;
+  --color-text-link: #7BAAFF;
+  --color-text-danger: #E76A6A;
+  --color-text-on-accent: #FFFFFF;
+
+  --color-border-subtle: #182029;
+  --color-border-default: #1F262F;
+  --color-border-strong: #333C49;
+  --color-border-focus: #4B8BFF;
+
+  --color-accent-default: #4B8BFF;
+  --color-accent-hover: #7BAAFF;
+  --color-accent-pressed: #2C6BED;
+  --color-accent-subtle: #0D2450;
+
+  --color-bubble-outgoing-bg: #1E55C9;
+  --color-bubble-incoming-bg: #1F262F;
+  --color-bubble-incoming-text: #F7F8FA;
+  --color-bubble-quote-bg: #333C49;
+  --color-bubble-quote-border: #7BAAFF;
+
+  --color-status-online: #3DBE84;
+  --color-status-success: #3DBE84;
+  --color-status-danger: #E76A6A;
+  --color-status-warning: #EBAA3A;
+  --color-status-unread-bg: #4B8BFF;
+  --color-status-unread-text: #0B0F14;
+
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body { background: var(--color-bg-canvas); color: var(--color-text-primary); }
+
+/* Focus is always visible — brief §19. */
+:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }

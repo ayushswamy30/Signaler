@@ -19,7 +19,7 @@ authentication and real-time delivery come in later stages.
 | Database hardening: FK/index audit, cross-model integration tests | Done |
 | Authentication, services, API endpoints, WebSockets | Not started |
 | UI/UX design — tokens, design system, 21 screens | Done |
-| Frontend (Next.js) | Not started |
+| Frontend (Next.js + TypeScript) — app shell, auth, settings, dark mode | Done |
 
 149 tests pass; CI runs them on every pull request.
 
@@ -27,11 +27,15 @@ authentication and real-time delivery come in later stages.
 
 - **Backend** — Python 3.11, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic, pytest
 - **Database** — SQLite (the schema is written to stay portable to PostgreSQL)
-- **Frontend** — Next.js (planned)
+- **Frontend** — Next.js 15 (App Router), TypeScript, Tailwind CSS
 
 ## Layout
 
 ```
+frontend/
+  src/app/        routes: chat, login, register, verify, settings
+  src/components/ Avatar, Button, Field, MessageBubble, Composer, Sidebar, Modal
+  src/lib/        types, sample data, helpers
 backend/
   app/
     main.py       application setup: CORS, router mounting
