@@ -2,6 +2,9 @@
 
 FastAPI + SQLAlchemy + SQLite backend, organised as a modular monolith.
 
+Run every command below from the `backend/` directory: the SQLite path, the
+`.env` file, and `alembic.ini` are all resolved relative to it.
+
 ## Setup
 
 ```bash
@@ -10,12 +13,31 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+alembic upgrade head          # create the database; nothing does this at startup
 ```
 
-## Run
+## Configuration
+
+Settings come from the environment, read once by `app/core/config.py`. Copying
+`.env.example` to `.env` gives working local defaults, so nothing needs editing
+to get started. `.env` is gitignored and must never be committed.
+
+| Variable | Purpose |
+| --- | --- |
+| `APP_NAME`, `ENVIRONMENT`, `DEBUG` | Application identity and debug mode |
+| `DATABASE_URL` | SQLAlchemy URL; used by the app *and* by Alembic |
+| `CORS_ORIGINS` | Comma-separated allowed origins for the Next.js dev server |
+| `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` | Placeholders for later authentication; unused today. Replace the secret before any real use. |
+
+## Run the server
 
 ```bash
 uvicorn app.main:app --reload    # http://127.0.0.1:8000/api/health
+```
+
+## Run the tests
+
+```bash
 pytest
 ```
 

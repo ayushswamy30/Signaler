@@ -5,6 +5,8 @@ is the registration point, and that Alembic reads the same metadata the
 application uses. They deliberately create no application tables.
 """
 
+from pathlib import Path
+
 import sqlalchemy as sa
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
@@ -14,6 +16,19 @@ from sqlalchemy.orm import DeclarativeBase
 
 import app.models
 from app.database.database import NAMING_CONVENTION, Base
+
+# Resolved from this file rather than the working directory so the suite passes
+# regardless of where pytest is invoked from.
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+ALEMBIC_INI = BACKEND_DIR / "alembic.ini"
+
+
+def _alembic_config() -> Config:
+    config = Config(str(ALEMBIC_INI))
+    # script_location is relative to alembic.ini, which Config does not resolve
+    # on its own when invoked from another directory.
+    config.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
+    return config
 
 
 def test_base_is_the_single_declarative_base() -> None:
@@ -59,8 +74,7 @@ def test_alembic_can_load_the_application_metadata() -> None:
 
 
 def test_migration_history_has_a_single_head() -> None:
-    config = Config("alembic.ini")
-    script = ScriptDirectory.from_config(config)
+    script = ScriptDirectory.from_config(_alembic_config())
 
     # Multiple heads mean branched history that "alembic upgrade head" cannot
     # resolve; catching it here is cheaper than at deploy time.
@@ -70,5 +84,4 @@ def test_migration_history_has_a_single_head() -> None:
 def test_alembic_ini_does_not_hard_code_a_database_url() -> None:
     # The URL must come from app.core.config so the app and migrations cannot
     # drift onto different databases.
-    config = Config("alembic.ini")
-    assert not config.get_main_option("sqlalchemy.url", default="")
+    assert not _alembic_config().get_main_option("sqlalchemy.url", default="")
