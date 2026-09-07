@@ -48,6 +48,12 @@ def database_url(tmp_path: Path) -> str:
 
 
 @pytest.fixture
+def alembic_config(database_url: str) -> Config:
+    """Alembic config for the temporary database, for tests driving migrations."""
+    return _alembic_config(database_url)
+
+
+@pytest.fixture
 def migrated_engine(database_url: str) -> Generator[Engine, None, None]:
     """Engine for a temporary database with all migrations applied."""
     command.upgrade(_alembic_config(database_url), "head")

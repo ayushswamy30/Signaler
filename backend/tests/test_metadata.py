@@ -54,23 +54,39 @@ def test_metadata_carries_the_naming_convention() -> None:
         assert key in Base.metadata.naming_convention
 
 
-def test_no_application_tables_are_defined_yet() -> None:
-    # Application models arrive in A02. This guards against a stray table being
-    # registered here by accident.
-    assert Base.metadata.sorted_tables == []
+def test_registered_models_are_on_the_shared_metadata() -> None:
+    """Guards model registration, the way the zero-table check used to.
+
+    Before A02 this asserted the metadata was empty. Now that real models
+    exist, the same intent is served by pinning the set of registered tables:
+    a model added without being imported in app/models/__init__.py, or a table
+    registered by accident, both show up here.
+    """
+    assert set(Base.metadata.tables) == {"users"}
 
 
-def test_alembic_can_load_the_application_metadata() -> None:
-    """Alembic must be able to diff Base.metadata against a real database."""
-    # An empty in-memory database, not the project's SQLite file: this compares
-    # the metadata without touching developer state.
-    engine = sa.create_engine("sqlite://")
-    with engine.connect() as connection:
+def test_user_model_is_registered() -> None:
+    from app.models import User
+
+    assert "User" in app.models.__all__
+    assert User.__tablename__ == "users"
+    assert User.__table__ is Base.metadata.tables["users"]
+
+
+def test_migrations_match_the_models(migrated_engine: sa.Engine) -> None:
+    """The migrations must produce exactly the schema the models describe.
+
+    Previously this diffed the metadata against an empty database, which was
+    only meaningful while there were no models. Now it compares against a
+    migrated database, so it fails if a model is changed without a migration
+    (or vice versa) -- the same drift `alembic check` catches, enforced by the
+    suite.
+    """
+    with migrated_engine.connect() as connection:
         context = MigrationContext.configure(connection)
         diff = compare_metadata(context, Base.metadata)
 
-    # Zero models and an empty database must agree.
-    assert diff == []
+    assert diff == [], f"models and migrations disagree: {diff}"
 
 
 def test_migration_history_has_a_single_head() -> None:

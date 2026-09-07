@@ -147,3 +147,42 @@ means adding a member produces no schema diff.
   in service code — concurrent requests defeat application-level checks.
 - Add an index only for a query the code actually makes. Every index costs write
   throughput. Foreign keys used for lookups are the usual justified case.
+
+## Models
+
+### User (`app/models/user.py`)
+
+A registered account, and the parent entity for contacts, conversation
+participants and messages in later stages.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | int | Surrogate primary key, `pk_users` |
+| `username` | `String(50)` | Required, unique (`uq_users_username`) |
+| `phone_number` | `String(32)` | Optional, unique when present |
+| `display_name` | `String(100)` | Required; the visible name |
+| `avatar_url` | `String(512)` | Optional |
+| `password_hash` | `String(255)` | Required; a hash, never a password |
+| `is_online` | bool | Required, defaults to `False` |
+| `last_seen` | `UtcDateTime` | Optional |
+| `created_at` / `updated_at` | `UtcDateTime` | From `TimestampMixin` |
+
+Decisions worth knowing:
+
+- **`phone_number` is nullable but unique.** SQL treats NULLs as distinct in a
+  unique constraint, so any number of accounts may have no phone number while a
+  given number can still be claimed only once. No partial index is needed, and
+  there is a test proving it — get this wrong and exactly one phoneless account
+  is possible.
+- **No explicit index on `username` or `phone_number`.** A unique constraint is
+  already backed by a unique index, so `index=True` would only add a second,
+  redundant index on the same column.
+- **`password_hash` holds a hash and nothing else.** The model does no hashing
+  and exposes no password helpers; that is the service layer's job.
+- **Presence is not managed by the model.** `is_online` and `last_seen` have no
+  `onupdate` hook, so an unrelated profile edit cannot silently mark someone
+  online or move their last-seen time. Services and the WebSocket layer write
+  them deliberately.
+- **Timestamps follow the existing convention**: `TimestampMixin` for
+  `created_at` / `updated_at`, `UtcDateTime` for `last_seen`, all
+  Python-generated, aware UTC, microsecond precision.
