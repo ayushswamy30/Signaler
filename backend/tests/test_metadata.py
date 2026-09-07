@@ -148,3 +148,72 @@ def test_alembic_ini_does_not_hard_code_a_database_url() -> None:
     # The URL must come from app.core.config so the app and migrations cannot
     # drift onto different databases.
     assert not _alembic_config().get_main_option("sqlalchemy.url", default="")
+
+
+def test_the_index_set_is_exactly_what_the_audit_justified(
+    migrated_engine: sa.Engine,
+) -> None:
+    """Pins every explicit index, so gaps and redundancy both show up here.
+
+    Each entry earns its place against a real access pattern; primary keys and
+    unique constraints already supply their own indexes and are not repeated.
+    Deliberately absent: a plain messages.conversation_id index (the composite
+    covers the prefix and the ordering), and separate indexes on
+    message_status.message_id or conversation_participants.conversation_id
+    (covered by the unique constraint and the composite primary key).
+    """
+    inspector = sa.inspect(migrated_engine)
+    actual = {
+        table: sorted(ix["name"] for ix in inspector.get_indexes(table))
+        for table in inspector.get_table_names()
+        if table != "alembic_version"
+    }
+
+    assert actual == {
+        # Reverse lookup "who saved me", and the ON DELETE CASCADE sweep.
+        "contacts": ["ix_contacts_contact_user_id"],
+        # "every conversation this user is in" -- the conversation list.
+        "conversation_participants": ["ix_conversation_participants_user_id"],
+        "conversations": [],
+        # Backs the RESTRICT check when a user deletion is attempted.
+        "message_status": ["ix_message_status_user_id"],
+        "messages": [
+            # Filter and ORDER BY together for the history query.
+            "ix_messages_conversation_id_created_at",
+            # The replies relationship and the SET NULL sweep.
+            "ix_messages_reply_to_id",
+            # Backs the RESTRICT check.
+            "ix_messages_sender_id",
+        ],
+        "users": [],
+    }
+
+
+def test_every_foreign_key_has_a_deliberate_delete_rule(
+    migrated_engine: sa.Engine,
+) -> None:
+    """No foreign key may fall back to the default NO ACTION.
+
+    Each rule is a decision: CASCADE where the parent owns the child, RESTRICT
+    where deleting would destroy history, SET NULL where the reference is
+    optional context.
+    """
+    inspector = sa.inspect(migrated_engine)
+    actual = {
+        (table, fk["constrained_columns"][0]): fk["options"].get("ondelete")
+        for table in inspector.get_table_names()
+        if table != "alembic_version"
+        for fk in inspector.get_foreign_keys(table)
+    }
+
+    assert actual == {
+        ("contacts", "user_id"): "CASCADE",
+        ("contacts", "contact_user_id"): "CASCADE",
+        ("conversation_participants", "conversation_id"): "CASCADE",
+        ("conversation_participants", "user_id"): "RESTRICT",
+        ("messages", "conversation_id"): "CASCADE",
+        ("messages", "sender_id"): "RESTRICT",
+        ("messages", "reply_to_id"): "SET NULL",
+        ("message_status", "message_id"): "CASCADE",
+        ("message_status", "user_id"): "RESTRICT",
+    }

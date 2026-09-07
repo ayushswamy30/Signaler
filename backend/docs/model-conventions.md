@@ -350,3 +350,100 @@ Decisions worth knowing:
 - **Rules the model does not enforce**: empty content, edit permissions,
   expiry, and status progression (nothing stops `READ` going back to `SENT`).
   All service-layer concerns.
+
+## A02 summary: the finished data model
+
+Six tables, audited end to end at the close of A02.
+
+### Data ownership
+
+Ownership decides deletion, and it flows in one direction only:
+
+```
+Conversation ──owns──> ConversationParticipant
+             └─owns──> Message ──owns──> MessageStatus
+
+User ────────references, never owns────> everything above
+```
+
+- A **conversation owns** its participants and messages; deleting it removes
+  them, and removing a message removes its status rows in turn.
+- A **message owns** its status rows.
+- A **user owns nothing**. Accounts reference history; they do not contain it.
+  Deleting a user therefore cannot delete a message.
+
+Contacts are the exception that proves the rule: they cascade from `users`
+because a contact link is not history — it is one person's private address
+book entry, meaningless once either side is gone.
+
+Every foreign key has an explicit rule; none falls back to the default, and a
+test pins the whole set.
+
+### Direct conversations
+
+One `Conversation` model covers both kinds, split by `ConversationType`.
+
+- **DIRECT uniqueness is a service-layer invariant.** Participants live in a
+  child table, so no column constraint can express "this pair already has a
+  direct conversation". Solved with triggers, pair hashes or a `pair_key`
+  column it would leak denormalised state into the schema; the normalised
+  structure is kept instead.
+- **There is a concurrency hazard to solve when `ConversationService` is
+  built.** Two simultaneous requests can both query, both see no existing
+  direct conversation, and both create one. A check-then-insert is not enough:
+  the service needs a unique key it can insert against, a serialisable
+  transaction, or an application lock — decided when that service exists.
+- **The database does not enforce the participant count.** A DIRECT
+  conversation with three participants is accepted today; a test records that.
+
+### Groups
+
+- Groups may hold any number of participants.
+- `ParticipantRole` is `MEMBER` or `ADMIN`, structural only.
+- **Exactly-one-admin, and who may add or remove members, are service-layer
+  rules.** Nothing stops every admin being demoted; a test records that too.
+
+### Read state
+
+- `MessageStatus` is per-message, per-user delivery state, unique on
+  `(message_id, user_id)`.
+- **Status progression is not enforced.** The column stores state, so
+  `READ → SENT` is accepted by the database. Monotonic progression belongs to
+  the message and WebSocket services.
+- `ConversationParticipant.last_read_message_id` **remains a nullable integer
+  with no foreign key**, deliberately, even though `messages` now exists.
+  Adding the reference is its own migration and its own decision — it also
+  introduces a `conversation_participants → messages → conversations`
+  dependency that table-drop ordering must then respect. It should land with
+  the read-state service logic that gives it meaning, not before.
+
+### Account deletion
+
+**Account deletion/tombstoning is intentionally unresolved and must be
+designed before production account deletion is implemented.**
+
+Three tables reference `users` with `RESTRICT` — `conversation_participants`,
+`messages`, `message_status` — so an account carrying any history cannot
+currently be deleted at all. That is the deliberate default: fail loudly
+rather than erase what somebody said in other people's conversations. It is
+not a complete answer. A tombstone, soft delete or anonymisation design is
+needed, and it is a product decision as much as a technical one. Nothing here
+adds `deleted_at`, tombstone users, anonymisation or purge jobs.
+
+### Replies
+
+`Message.reply_to_id` is a nullable self-reference with `ON DELETE SET NULL`.
+Deleting a referenced message clears the pointer and leaves the reply — and
+everything further down the chain — intact.
+
+### Realtime state is not in the database
+
+Typing indicators, online presence and WebSocket connection state are
+**ephemeral** and are deliberately not database entities. They change many
+times a second, are meaningless after a disconnect, and would turn every
+keystroke into a write. They belong in connection state or a cache.
+
+`User.is_online` and `User.last_seen` are the one deliberate exception: a
+*persisted summary* that survives a restart so a client has something to show
+before any live signal arrives. They are written by services, never by the
+model.

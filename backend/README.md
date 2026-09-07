@@ -41,8 +41,9 @@ uvicorn app.main:app --reload    # http://127.0.0.1:8000/api/health
 pytest
 ```
 
-130 tests: the health endpoint, metadata and migration wiring, the test-database
-and foreign-key infrastructure, and the six models' database behaviour.
+149 tests: the health endpoint, metadata and migration wiring, the test-database
+and foreign-key infrastructure, the six models' database behaviour, and
+cross-model integration over the whole object graph.
 
 ## Testing against the database
 

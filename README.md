@@ -16,10 +16,11 @@ authentication and real-time delivery come in later stages.
 | Database layer and model conventions | Done |
 | Models: `User`, `Contact`, `Conversation`, `ConversationParticipant` | Done |
 | Models: `Message`, `MessageStatus` | Done |
+| Database hardening: FK/index audit, cross-model integration tests | Done |
 | Authentication, services, API endpoints, WebSockets | Not started |
 | Frontend (Next.js) | Not started |
 
-130 tests pass; CI runs them on every pull request.
+149 tests pass; CI runs them on every pull request.
 
 ## Stack
 

@@ -33,8 +33,12 @@ class Contact(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
+    # Indexed because the composite primary key only covers lookups starting
+    # with user_id. Without it, "who has saved me?" (User.contact_of) scans the
+    # table, and so does the ON DELETE CASCADE sweep on every user deletion,
+    # which has to find the rows pointing at the departing account.
     contact_user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
     )
 
     # A contact row records that a link was made; it is not edited afterwards,
