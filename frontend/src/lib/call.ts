@@ -40,6 +40,28 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
 ];
 
+/** Why calling cannot work here at all, or null if it can.
+ *
+ *  Checked before anything is attempted, because these failures are about the
+ *  page rather than about a device: on a plain-HTTP origin
+ *  `navigator.mediaDevices` is not merely blocked, it is `undefined`, so the
+ *  attempt would surface as a confusing TypeError about reading a property
+ *  rather than as "this needs HTTPS". localhost counts as secure, so local
+ *  development is unaffected. */
+function unsupportedReason(): string | null {
+  if (typeof window === "undefined") return null;
+  if (!window.isSecureContext) {
+    return "Calls need a secure connection. Open Signaler over HTTPS and try again.";
+  }
+  if (
+    typeof window.RTCPeerConnection !== "function" ||
+    typeof navigator.mediaDevices?.getUserMedia !== "function"
+  ) {
+    return "This browser does not support calls. Try a recent Chrome, Edge, Firefox or Safari.";
+  }
+  return null;
+}
+
 /** Turn a getUserMedia rejection into something worth showing a person.
  *
  *  These are the cases a user can actually act on: the browser's own message
@@ -60,8 +82,6 @@ function describeMediaError(error: unknown, kind: CallKind): string {
       return `Your ${devices} is already in use by another app. Close it and try again.`;
     case "OverconstrainedError":
       return `Your ${devices} does not support the requested settings.`;
-    case "SecurityError":
-      return "Calls need a secure connection (HTTPS).";
     default:
       return `Could not start your ${devices}.`;
   }
@@ -97,6 +117,11 @@ const IDLE: CallSnapshot = {
 
 export function useCall() {
   const [call, setCall] = useState<CallSnapshot>(IDLE);
+
+  // Read inside the socket handler, which is subscribed once and would
+  // otherwise close over the status as it was at subscription time.
+  const statusRef = useRef<CallStatus>("idle");
+  statusRef.current = call.status;
 
   // WebRTC objects are mutable and long-lived, and must not trigger renders.
   const connection = useRef<RTCPeerConnection | null>(null);
@@ -213,6 +238,12 @@ export function useCall() {
     async (conversation: Conversation, peer: User, kind: CallKind) => {
       if (conversation.type !== "direct") return;
 
+      const unsupported = unsupportedReason();
+      if (unsupported) {
+        finish(unsupported);
+        return;
+      }
+
       setCall({ ...IDLE, status: "dialling", kind, conversationId: conversation.id, peer });
       conversationId.current = conversation.id;
 
@@ -241,6 +272,13 @@ export function useCall() {
     const offer = pendingOffer.current;
     const id = conversationId.current;
     if (!offer || id === null) return;
+
+    const unsupported = unsupportedReason();
+    if (unsupported) {
+      socket.send({ type: "call.decline", conversation_id: id });
+      finish(unsupported);
+      return;
+    }
 
     setCall((current) => ({ ...current, status: "connecting" }));
 
@@ -375,6 +413,18 @@ export function useCall() {
         case "call.unavailable":
           finish("They are not online right now.");
           break;
+
+        case "error": {
+          // The server rejects an invite it will not relay -- and, briefly
+          // after a deploy, a backend that predates call support rejects every
+          // one of them. Without this the caller sits on "Calling..." forever.
+          //
+          // Error frames are generic, so this only acts while a call is being
+          // set up: during an active call an unrelated error must not drop it.
+          if (statusRef.current !== "dialling" && statusRef.current !== "connecting") return;
+          finish((data.detail as string) || "The call could not be placed.");
+          break;
+        }
       }
     });
 
