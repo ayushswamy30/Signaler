@@ -48,8 +48,12 @@ export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCance
   }
 
   // Leaving the conversation, or the page, must clear the indicator for
-  // everyone else -- otherwise it hangs there until their own timeout.
-  useEffect(() => stopTyping, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // everyone else -- otherwise it hangs there until their own timeout. The
+  // cleanup is read through a ref so the effect captures nothing from the
+  // render and genuinely runs once, on unmount.
+  const cleanup = useRef(stopTyping);
+  cleanup.current = stopTyping;
+  useEffect(() => () => cleanup.current(), []);
 
   async function submit(e?: FormEvent) {
     e?.preventDefault();
