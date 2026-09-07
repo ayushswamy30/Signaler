@@ -12,6 +12,7 @@ from app.models.types import sa_enum
 
 if TYPE_CHECKING:
     from app.models.conversation_participant import ConversationParticipant
+    from app.models.message import Message
 
 
 class ConversationType(enum.Enum):
@@ -52,6 +53,14 @@ class Conversation(TimestampMixin, Base):
     # Deleting a conversation deletes its participant rows: a participant row
     # describes membership of this conversation and means nothing without it.
     participants: Mapped[list["ConversationParticipant"]] = relationship(
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # A conversation owns its messages, so deleting it deletes them (and,
+    # through Message, their status rows).
+    messages: Mapped[list["Message"]] = relationship(
         back_populates="conversation",
         cascade="all, delete-orphan",
         passive_deletes=True,

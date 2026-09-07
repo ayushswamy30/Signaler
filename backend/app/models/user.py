@@ -13,6 +13,8 @@ from app.models.types import UtcDateTime
 if TYPE_CHECKING:
     from app.models.contact import Contact
     from app.models.conversation_participant import ConversationParticipant
+    from app.models.message import Message
+    from app.models.message_status import MessageStatus
 
 
 class User(TimestampMixin, Base):
@@ -81,6 +83,19 @@ class User(TimestampMixin, Base):
     # joined_at and read state, so hiding it behind a many-to-many would only
     # obscure the thing callers actually need.
     conversation_participations: Mapped[list["ConversationParticipant"]] = relationship(
+        back_populates="user",
+        passive_deletes=True,
+    )
+
+    # Both foreign keys are RESTRICT, so neither relationship carries a delete
+    # cascade: adding one would delete the very history the database is
+    # refusing to lose. passive_deletes keeps SQLAlchemy from trying to clear
+    # the columns itself, letting the RESTRICT surface.
+    sent_messages: Mapped[list["Message"]] = relationship(
+        back_populates="sender",
+        passive_deletes=True,
+    )
+    message_statuses: Mapped[list["MessageStatus"]] = relationship(
         back_populates="user",
         passive_deletes=True,
     )

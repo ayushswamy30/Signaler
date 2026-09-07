@@ -41,8 +41,8 @@ uvicorn app.main:app --reload    # http://127.0.0.1:8000/api/health
 pytest
 ```
 
-91 tests: the health endpoint, metadata and migration wiring, the test-database
-and foreign-key infrastructure, and the four models' database behaviour.
+130 tests: the health endpoint, metadata and migration wiring, the test-database
+and foreign-key infrastructure, and the six models' database behaviour.
 
 ## Testing against the database
 
@@ -96,13 +96,14 @@ deletion semantics, and which rules are deliberately left to the service layer
 | `contacts` | `(user_id, contact_user_id)` | A directed saved link between two users |
 | `conversations` | `id` | Direct and group conversations, split by a `ConversationType` enum |
 | `conversation_participants` | `(conversation_id, user_id)` | Membership, carrying role, join time and read position |
+| `messages` | `id` | A message in a conversation: content, type, optional reply target, edit/expiry timestamps |
+| `message_status` | `id`, unique `(message_id, user_id)` | Per-recipient delivery state: `SENT` / `DELIVERED` / `READ` |
 
 Shared machinery lives in `app/models/`: `Base` (in `app/database/database.py`)
 with its constraint naming convention, `TimestampMixin`, the `UtcDateTime`
 column type, and the `sa_enum()` helper.
 
-Not yet built: `Message`, `MessageStatus`, authentication, services, and any
-API beyond `/api/health`.
+Not yet built: authentication, services, and any API beyond `/api/health`.
 
 ### Adding a model
 

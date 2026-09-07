@@ -92,17 +92,28 @@ def test_registered_models_are_on_the_shared_metadata() -> None:
         "contacts",
         "conversations",
         "conversation_participants",
+        "messages",
+        "message_status",
     }
 
 
 def test_models_are_registered() -> None:
-    from app.models import Contact, Conversation, ConversationParticipant, User
+    from app.models import (
+        Contact,
+        Conversation,
+        ConversationParticipant,
+        Message,
+        MessageStatus,
+        User,
+    )
 
     for model, table_name in (
         (User, "users"),
         (Contact, "contacts"),
         (Conversation, "conversations"),
         (ConversationParticipant, "conversation_participants"),
+        (Message, "messages"),
+        (MessageStatus, "message_status"),
     ):
         assert model.__name__ in app.models.__all__
         assert model.__tablename__ == table_name

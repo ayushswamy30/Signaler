@@ -247,16 +247,28 @@ def test_last_read_message_id_stores_an_integer_without_a_messages_table(
     assert db_session.scalars(sa.select(ConversationParticipant)).one().last_read_message_id == 42
 
 
-def test_no_messages_table_exists_yet(migrated_engine: sa.Engine) -> None:
-    assert "messages" not in sa.inspect(migrated_engine).get_table_names()
+def test_read_state_is_unconstrained_even_though_messages_now_exists(
+    migrated_engine: sa.Engine,
+) -> None:
+    """The A02.4 decision survives the arrival of the Message model.
 
+    This previously asserted that no messages table existed. That table exists
+    now, but last_read_message_id was deliberately left as a plain integer:
+    adding the foreign key is its own migration and its own decision, not a
+    side effect of Message being created. The guard is retargeted rather than
+    dropped so the choice stays visible.
+    """
+    inspector = sa.inspect(migrated_engine)
 
-def test_last_read_message_id_has_no_foreign_key_yet(migrated_engine: sa.Engine) -> None:
+    assert "messages" in inspector.get_table_names()
+
     referenced = {
         fk["referred_table"]
-        for fk in sa.inspect(migrated_engine).get_foreign_keys("conversation_participants")
+        for fk in inspector.get_foreign_keys("conversation_participants")
     }
-    assert referenced == {"conversations", "users"}
+    assert referenced == {"conversations", "users"}, (
+        "last_read_message_id gained a foreign key without a deliberate decision"
+    )
 
 
 # --- composite key ---------------------------------------------------------

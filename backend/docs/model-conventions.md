@@ -288,3 +288,65 @@ Decisions worth knowing:
   would make ordinary steps impossible, since a conversation must exist before
   its participants can reference it. `ADMIN` and `MEMBER` are structural only;
   no authorisation logic lives in the model.
+
+### Message and MessageStatus
+
+**messages**
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | int | Primary key |
+| `conversation_id` | int FK → `conversations.id` | Required, `ON DELETE CASCADE` |
+| `sender_id` | int FK → `users.id` | Required, `ON DELETE RESTRICT`, indexed |
+| `content` | `Text` | Required; not validated here |
+| `message_type` | `MessageType` | Required; only `TEXT` today |
+| `reply_to_id` | int FK → `messages.id` | Nullable, `ON DELETE SET NULL`, indexed |
+| `created_at` | `UtcDateTime` | Required |
+| `edited_at` / `expires_at` | `UtcDateTime` | Nullable; written by services, never by the model |
+
+**message_status** — one row per (message, recipient)
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | int | Primary key |
+| `message_id` | int FK → `messages.id` | Required, `ON DELETE CASCADE` |
+| `user_id` | int FK → `users.id` | Required, `ON DELETE RESTRICT`, indexed |
+| `status` | `DeliveryStatus` | Required; `SENT` / `DELIVERED` / `READ` |
+| `updated_at` | `UtcDateTime` | Required; advances on update |
+
+Decisions worth knowing:
+
+- **Deletion flows down, never sideways into accounts.** Deleting a
+  conversation deletes its messages, and deleting a message deletes its status
+  rows — a two-level cascade. Deleting a *user* does neither: both
+  `messages.sender_id` and `message_status.user_id` are `RESTRICT`, so the
+  database refuses rather than erasing what someone said in other people's
+  conversations. This matches `ConversationParticipant.user_id`.
+- **Account deletion remains unresolved**, and now has three tables blocking
+  it. A tombstone or soft-delete design is needed before real account deletion
+  can work; `User` was deliberately not changed here.
+- **`reply_to_id` is `SET NULL`, not `RESTRICT`.** A reply is history and must
+  outlive the message it answers, so the pointer is simply cleared. `RESTRICT`
+  would also have made any conversation containing a reply impossible to
+  delete, because the cascade would hit messages referencing each other —
+  verified against SQLite before choosing.
+- **`MessageStatus` uses a surrogate primary key with a unique constraint on
+  `(message_id, user_id)`**, unlike `Contact` and `ConversationParticipant`,
+  which use composite primary keys. Those are pure associations that nothing
+  references, so the pair is their identity. A status row is a mutable entity
+  with its own lifecycle, so a single-column key keeps it addressable; the
+  unique constraint supplies the same duplicate protection.
+- **`last_read_message_id` stays a plain integer.** Now that `messages` exists
+  the foreign key *could* be added, but doing so is its own migration and its
+  own decision, not a side effect of this stage. A retargeted test guards that.
+- **Message history is ordered by `created_at`**, and the composite index
+  `(conversation_id, created_at)` serves the whole query
+  `WHERE conversation_id = ? ORDER BY created_at` — filter and sort together.
+  A plain `conversation_id` index would leave a sort behind it.
+- **Other indexes**: `sender_id` and `message_status.user_id` back the
+  `RESTRICT` checks, which otherwise scan the whole table on every user
+  deletion; `reply_to_id` backs both the `replies` relationship and the
+  `SET NULL` sweep when a message is deleted. No speculative indexes.
+- **Rules the model does not enforce**: empty content, edit permissions,
+  expiry, and status progression (nothing stops `READ` going back to `SENT`).
+  All service-layer concerns.

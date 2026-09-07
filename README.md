@@ -15,10 +15,11 @@ authentication and real-time delivery come in later stages.
 | Migrations (Alembic) | Done |
 | Database layer and model conventions | Done |
 | Models: `User`, `Contact`, `Conversation`, `ConversationParticipant` | Done |
-| Messages, authentication, services, API endpoints, WebSockets | Not started |
+| Models: `Message`, `MessageStatus` | Done |
+| Authentication, services, API endpoints, WebSockets | Not started |
 | Frontend (Next.js) | Not started |
 
-91 tests pass; CI runs them on every pull request.
+130 tests pass; CI runs them on every pull request.
 
 ## Stack
 
@@ -66,7 +67,7 @@ are in [backend/docs/model-conventions.md](backend/docs/model-conventions.md).
 
 ## Data model
 
-Four tables so far:
+Six tables so far:
 
 - **`users`** — accounts. Unique username, optional-but-unique phone number,
   password hash, presence.
@@ -77,6 +78,10 @@ Four tables so far:
 - **`conversation_participants`** — membership as an association object,
   carrying role, join time and read position. Composite key
   `(conversation_id, user_id)`.
+- **`messages`** — content, type, and an optional self-referential reply
+  target. Indexed on `(conversation_id, created_at)` for history queries.
+- **`message_status`** — per-recipient delivery state (`SENT`/`DELIVERED`/
+  `READ`), one row per message and user.
 
 ## Engineering notes
 

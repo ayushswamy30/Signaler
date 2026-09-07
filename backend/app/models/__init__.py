@@ -19,6 +19,8 @@ Alembic imports this package in ``alembic/env.py`` before reading
 from app.models.contact import Contact
 from app.models.conversation import Conversation, ConversationType
 from app.models.conversation_participant import ConversationParticipant, ParticipantRole
+from app.models.message import Message, MessageType
+from app.models.message_status import DeliveryStatus, MessageStatus
 from app.models.user import User
 
 __all__ = [
@@ -26,6 +28,10 @@ __all__ = [
     "Conversation",
     "ConversationParticipant",
     "ConversationType",
+    "DeliveryStatus",
+    "Message",
+    "MessageStatus",
+    "MessageType",
     "ParticipantRole",
     "User",
 ]
