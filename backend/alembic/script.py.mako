@@ -9,6 +9,11 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+
+# Custom column types (e.g. UtcDateTime) are rendered by autogenerate as
+# fully-qualified names, so the module must be imported here or the migration
+# fails with NameError when it runs.
+import app.models.types
 ${imports if imports else ""}
 
 # revision identifiers, used by Alembic.

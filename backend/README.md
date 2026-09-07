@@ -19,6 +19,12 @@ uvicorn app.main:app --reload    # http://127.0.0.1:8000/api/health
 pytest
 ```
 
+## Models
+
+Conventions for ORM models — the single declarative `Base`, how a model is
+registered so Alembic can see it, and the timestamp, enum, and relationship
+rules — are in [docs/model-conventions.md](docs/model-conventions.md).
+
 ## Database migrations
 
 The schema is managed exclusively by Alembic. Nothing creates tables at
