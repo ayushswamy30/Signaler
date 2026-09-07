@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clsx } from "@/lib/clsx";
 import { useAuth, useRequireAuth } from "@/lib/auth";
+import { useCall, type CallKind } from "@/lib/call";
 import { useMessenger } from "@/lib/useMessenger";
-import { crossesDay, formatDateSeparator, subtitle, title } from "@/lib/format";
+import { counterpart, crossesDay, formatDateSeparator, subtitle, title } from "@/lib/format";
 import type { Message } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { Avatar, Button, EmptyState, Skeleton } from "@/components/Primitives";
@@ -14,6 +15,7 @@ import { Composer } from "@/components/Composer";
 import { NewMessageModal } from "@/components/NewMessageModal";
 import { NewGroupModal } from "@/components/NewGroupModal";
 import { ConversationInfo } from "@/components/ConversationInfo";
+import { CallOverlay } from "@/components/CallOverlay";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   ChatHeader,
@@ -50,6 +52,7 @@ function Messenger() {
   const { user } = useAuth();
   const me = user!;
   const app = useMessenger(me);
+  const calls = useCall();
 
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -87,6 +90,13 @@ function Messenger() {
   }
 
   const unread = active?.unreadCount ?? 0;
+
+  /** Start a call with the other person in the open conversation. */
+  function startCall(kind: CallKind) {
+    if (!active) return;
+    const other = counterpart(active, me.id);
+    if (other) void calls.start(active, other, kind);
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden bg-canvas">
@@ -165,12 +175,21 @@ function Messenger() {
                   <span className="truncate text-sm text-ink-muted">{subtitle(active, me.id)}</span>
                 </span>
               </button>
+              {active.type === "direct" && (
+                <div className="flex items-center pr-xs">
+                  <IconButton label="Start voice call" icon="phone"
+                    onClick={() => startCall("audio")} />
+                  <IconButton label="Start video call" icon="video"
+                    onClick={() => startCall("video")} />
+                </div>
+              )}
             </div>
 
             <div className="hidden md:block">
               <div className="relative">
                 <ChatHeader conversation={active} meId={me.id}
-                  onOpenInfo={() => setShowInfo((value) => !value)} />
+                  onOpenInfo={() => setShowInfo((value) => !value)}
+                  onCall={startCall} />
                 <div className="absolute right-[132px] top-1/2 -translate-y-1/2"><ThemeToggle /></div>
               </div>
             </div>
@@ -285,6 +304,8 @@ function Messenger() {
           void app.startDirect(user.id).then(() => setMobilePane("chat"));
         }}
       />
+
+      <CallOverlay controller={calls} />
 
       <NewGroupModal
         open={showNewGroup}

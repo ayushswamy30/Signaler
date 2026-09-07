@@ -1,83 +1,22 @@
 """Realtime behaviour over the /ws socket.
 
-These use a TestClient entered as a context manager, which is what makes the
-test meaningful: entering it runs the application lifespan (so ``events`` has an
-event loop to publish onto) and keeps every request and socket on that one loop.
-Without it, an HTTP request would run on a different loop from the socket and no
-broadcast would ever arrive.
+The ``live`` fixture in conftest runs the application lifespan, which is what
+makes these meaningful: without it an HTTP request would run on a different
+event loop from the socket and no broadcast would ever arrive.
 """
 
 import time
-from collections.abc import Callable, Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, sessionmaker
 
-from app.database.database import get_db
-from app.main import app
-from app.models.user import User
-from app.services import auth_service, conversation_service, message_service
+from app.services import conversation_service, group_service, message_service
 from app.websocket.manager import manager
+from tests.conftest import await_event as _await_event
+from tests.conftest import drain_ready as _drain_ready
 
 
-@pytest.fixture
-def live(migrated_engine: Engine, db_session: Session) -> Generator[TestClient, None, None]:
-    """A client whose lifespan is running, so socket broadcasts are delivered.
-
-    Unlike the HTTP-only ``client`` fixture, this one hands out a *fresh*
-    session per request and per socket rather than sharing the test's. A socket
-    holds its session for the whole connection, on a different thread from the
-    test body, and a single SQLAlchemy Session is not safe to use from two
-    threads at once. Both sessions talk to the same file, so anything the test
-    commits is visible to the application and vice versa.
-    """
-    factory = sessionmaker(bind=migrated_engine, autocommit=False, autoflush=False)
-
-    def override_get_db() -> Generator[Session, None, None]:
-        session = factory()
-        try:
-            yield session
-        finally:
-            session.close()
-
-    app.dependency_overrides[get_db] = override_get_db
-    try:
-        with TestClient(app) as client:
-            yield client
-    finally:
-        app.dependency_overrides.clear()
-        # The registry is process-wide, so a socket left over from a failed
-        # test would otherwise receive the next test's events.
-        manager._connections.clear()
-
-
-@pytest.fixture
-def token_for(db_session: Session) -> Callable[[User], str]:
-    def _token(user: User) -> str:
-        return auth_service.issue_session(db_session, user).access_token
-
-    return _token
-
-
-@pytest.fixture
-def sign_in(live: TestClient, token_for) -> Callable[[User], TestClient]:
-    def _as(user: User) -> TestClient:
-        live.headers["Authorization"] = f"Bearer {token_for(user)}"
-        return live
-
-    return _as
-
-
-def _drain_ready(socket) -> dict:
-    """Consume and return the ``ready`` frame every connection opens with."""
-    frame = socket.receive_json()
-    assert frame["type"] == "ready"
-    return frame
-
-
-def _eventually(predicate: Callable[[], bool], *, timeout: float = 3.0) -> bool:
+def _eventually(predicate, *, timeout: float = 3.0) -> bool:
     """Poll until ``predicate`` holds, or give up.
 
     Socket teardown finishes on the application's own thread, so a state change
@@ -90,21 +29,6 @@ def _eventually(predicate: Callable[[], bool], *, timeout: float = 3.0) -> bool:
             return True
         time.sleep(0.02)
     return False
-
-
-def _await_event(socket, wanted: str, *, limit: int = 5) -> dict:
-    """Read frames until one of type ``wanted`` arrives.
-
-    A socket carries every event its user is entitled to, so a test waiting for
-    one thing routinely meets another first -- a second client connecting emits
-    presence, and connecting at all emits delivery receipts. Skipping is what
-    keeps these tests about the event under test rather than about ordering.
-    """
-    for _ in range(limit):
-        frame = socket.receive_json()
-        if frame["type"] == wanted:
-            return frame
-    raise AssertionError(f"No {wanted!r} frame within {limit} frames.")
 
 
 def test_a_socket_without_a_token_is_closed(live: TestClient):
@@ -299,8 +223,6 @@ def test_removal_tells_the_group_and_the_person_removed(
     conversation is gone" -- they are no longer a participant, so the first
     event is not theirs to receive.
     """
-    from app.services import group_service
-
     group = group_service.create_group(
         db_session, creator_id=alice.id, name="Team", member_ids=[bob.id, carol.id]
     )

@@ -31,6 +31,14 @@ TYPING_STOP = "typing.stop"
 
 PRESENCE = "presence"
 
+# Call signalling. The server relays these between two peers and stores none of
+# them; see app/websocket/calls.py.
+CALL_INCOMING = "call.incoming"
+CALL_ACCEPTED = "call.accepted"
+CALL_CANDIDATE = "call.candidate"
+CALL_ENDED = "call.ended"
+CALL_UNAVAILABLE = "call.unavailable"
+
 CONVERSATION_CREATED = "conversation.created"
 CONVERSATION_UPDATED = "conversation.updated"
 CONVERSATION_DELETED = "conversation.deleted"

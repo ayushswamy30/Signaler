@@ -50,10 +50,10 @@ uvicorn app.main:app --reload
 pytest
 ```
 
-286 tests: the health endpoint, metadata and migration wiring, the test-database
+301 tests: the health endpoint, metadata and migration wiring, the test-database
 and foreign-key infrastructure, the seven models' database behaviour,
 cross-model integration over the whole object graph, password hashing and token
-handling, every service, the HTTP API, and the realtime socket.
+handling, every service, the HTTP API, the realtime socket, and call signalling.
 
 There is also an end-to-end smoke test that starts uvicorn as its own process on
 a throwaway database and drives it over real HTTP and a real WebSocket:
@@ -174,6 +174,25 @@ people's conversations.
 
 `broadcast.py` answers two questions in one place for each event: what it looks
 like on the wire, and who its audience is.
+
+`calls.py` is the call-signalling relay. It forwards a session description and
+network candidates between two people who already share a direct conversation,
+and stores nothing: a ringing table held in memory would be lost on every
+restart and would be wrong the moment a second worker existed. So "is the other
+person reachable" is answered from live socket presence, and "am I already on a
+call" is answered by the client, which is the only party that knows.
+
+Three rules it enforces, each for a reason:
+
+- **Membership is re-checked on every frame**, not just on the invite. Without
+  that, anyone who learned a conversation id could inject candidates into a call
+  between two other people, or hang it up.
+- **Direct conversations only.** A group call needs a mesh of peer connections
+  or a media server; failing clearly beats half-connecting three people.
+- **Payloads are size-capped and never parsed.** SDP and candidate shapes are
+  the browser's business, and interpreting them here would add a version
+  dependency; the cap stops the channel being used to push arbitrary data
+  between accounts.
 
 ## Seed data
 

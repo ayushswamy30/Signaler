@@ -20,7 +20,7 @@ from app.models.message_status import DeliveryStatus
 from app.models.user import User
 from app.schemas.user import UserPublic
 from app.services import auth_service, conversation_service, message_service, user_service
-from app.websocket import broadcast, events
+from app.websocket import broadcast, calls, events
 from app.websocket.manager import manager
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,8 @@ CLIENT_TYPING_START = "typing.start"
 CLIENT_TYPING_STOP = "typing.stop"
 CLIENT_MARK_READ = "message.read"
 CLIENT_PING = "ping"
+# Call signalling frames are namespaced under "call." and handled as a group;
+# app/websocket/calls.py owns the vocabulary and the validation.
 
 
 def _authenticate(db: Session, token: str) -> User:
@@ -77,6 +79,14 @@ async def _handle_client_event(db: Session, user: User, payload: dict[str, Any])
             user=user,
             is_typing=event_type == CLIENT_TYPING_START,
         )
+        return
+
+    if event_type in calls.CLIENT_EVENTS:
+        # Signalling is latency-critical: a ringing phone that takes a second
+        # to reach the other side feels broken. The relay does one membership
+        # check and no writes, so it goes to a worker thread like everything
+        # else that touches the database, but nothing more.
+        await asyncio.to_thread(calls.handle, db, user, payload)
         return
 
     if event_type == CLIENT_MARK_READ:

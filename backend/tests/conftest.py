@@ -7,6 +7,7 @@ would pass even if the migrations were broken or missing.
 """
 
 from collections.abc import Callable, Generator
+from typing import Any
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,7 @@ from app.database.database import create_app_engine, get_db
 from app.main import app
 from app.models.user import User
 from app.services import auth_service, user_service
+from app.websocket.manager import manager
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -165,3 +167,89 @@ def authed(client: TestClient, db_session: Session) -> Callable[[User], TestClie
         return client
 
     return _as
+
+
+# --- websocket fixtures -----------------------------------------------------
+#
+# Shared by every test needing a live socket. They live here rather than in one
+# test module because both the realtime tests and the call-signalling tests
+# need the same setup, and a second copy would drift.
+
+
+@pytest.fixture
+def live(migrated_engine: Engine, db_session: Session) -> Generator[TestClient, None, None]:
+    """A client with the application lifespan running.
+
+    Entering the TestClient as a context manager is what makes socket tests
+    meaningful: it runs the lifespan (so ``events`` has an event loop to publish
+    onto) and keeps every request and socket on that one loop. Without it an
+    HTTP request would run on a different loop from the socket, and no
+    broadcast would ever arrive.
+
+    Unlike the HTTP-only ``client`` fixture, this hands out a *fresh* session
+    per request and per socket rather than sharing the test's. A socket holds
+    its session for the whole connection, on a different thread from the test
+    body, and one SQLAlchemy Session is not safe to use from two threads at
+    once. Both talk to the same file, so anything the test commits is visible.
+    """
+    factory = sessionmaker(bind=migrated_engine, autocommit=False, autoflush=False)
+
+    def override_get_db() -> Generator[Session, None, None]:
+        session = factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
+        # The registry is process-wide, so a socket left over from a failed
+        # test would otherwise receive the next test's events.
+        manager._connections.clear()
+
+
+@pytest.fixture
+def token_for(db_session: Session) -> Callable[[User], str]:
+    """Mint an access token, for the socket query string."""
+
+    def _token(user: User) -> str:
+        return auth_service.issue_session(db_session, user).access_token
+
+    return _token
+
+
+@pytest.fixture
+def sign_in(live: TestClient, token_for: Callable[[User], str]) -> Callable[[User], TestClient]:
+    """Sign the live client in, for HTTP calls made alongside a socket."""
+
+    def _as(user: User) -> TestClient:
+        live.headers["Authorization"] = f"Bearer {token_for(user)}"
+        return live
+
+    return _as
+
+
+def drain_ready(socket: Any) -> dict:
+    """Consume and return the ``ready`` frame every connection opens with."""
+    frame = socket.receive_json()
+    assert frame["type"] == "ready"
+    return frame
+
+
+def await_event(socket: Any, wanted: str, *, limit: int = 6) -> dict:
+    """Read frames until one of type ``wanted`` arrives.
+
+    A socket carries every event its user is entitled to, so a test waiting for
+    one thing routinely meets another first -- a second client connecting emits
+    presence, and connecting at all emits delivery receipts. Skipping keeps
+    these tests about the event under test rather than about ordering.
+    """
+    for _ in range(limit):
+        frame = socket.receive_json()
+        if frame["type"] == wanted:
+            return frame
+    raise AssertionError(f"No {wanted!r} frame within {limit} frames.")

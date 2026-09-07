@@ -24,7 +24,7 @@ deprecated in Next 15 and prompts to set a linter up rather than running one.
 
 | Route | What it is |
 | --- | --- |
-| `/` | The app: conversation list, chat, replies, edits, group info, member management |
+| `/` | The app: conversation list, chat, replies, edits, group info, member management, voice and video calls |
 | `/login` | Sign in against `POST /api/auth/login` |
 | `/register` | Account creation, validating the same rules the API enforces |
 | `/verify` | Phone verification — designed, not built; labelled as a placeholder |
@@ -80,6 +80,31 @@ it. When it fails, the message stays on screen marked *Not delivered* with a
 Discard action — text someone typed must never disappear because the network
 did.
 
+## Calls
+
+`src/lib/call.ts` holds the WebRTC side: one peer connection, the media capture
+that raises the browser's permission prompt, and the signalling handlers. The
+overlay in `src/components/CallOverlay.tsx` is the ringing screen and the
+in-call screen, full-screen and above everything — a ringing phone that can be
+lost behind a window is a ringing phone you miss.
+
+Details worth knowing before changing it:
+
+- **Permission failures are translated.** `NotAllowedError`, `NotFoundError`,
+  `NotReadableError` and `SecurityError` each become a sentence describing what
+  to do; the browser's own "Requested device not found" explains nothing.
+- **Early ICE candidates are buffered.** `addIceCandidate` throws before a
+  remote description exists, and the first candidates routinely beat the answer,
+  so they are held and replayed rather than dropped.
+- **Teardown stops every track.** A `MediaStream` that is merely dereferenced
+  leaves the camera light on, which reads — correctly — as still being watched.
+- **Muting sets `track.enabled = false`** rather than stopping the track, so the
+  negotiated session stays intact and unmuting needs no renegotiation.
+- **The local preview is mirrored**, because people expect to see themselves as
+  they do in a mirror, and it is muted, or you hear yourself echo.
+- **Busy is decided here.** The server keeps no call state, so an incoming call
+  that arrives while a peer connection exists is declined automatically.
+
 ## Tokens
 
 `src/app/globals.css` defines every token as a CSS custom property under `:root`
@@ -109,4 +134,5 @@ Carried over from the design brief, and worth preserving in review:
 
 Shown in the UI and labelled, rather than silently missing: phone verification,
 profile photo upload, attachments, and the Privacy, Notifications, Calls and
-Linked devices settings sections.
+Linked devices *settings* sections. Calling itself works — what is missing there
+is a preferences screen for it (ringtone, default camera), not the feature.

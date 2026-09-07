@@ -225,6 +225,52 @@ async def run() -> None:
             removed = await next_event(bob_socket, "message.deleted")
             check(removed["data"]["message_id"] == message_id, "a deletion is broadcast")
 
+            print("\nCall signalling")
+            # Only the relay is exercised. There is no media here and nothing
+            # to assert about it: the audio and video path is negotiated
+            # directly between two browsers and never touches the server.
+            async with websockets.connect(
+                f"{WS_BASE}/ws?token={alice['access_token']}"
+            ) as alice_socket:
+                await next_event(alice_socket, "ready")
+
+                await alice_socket.send(
+                    json.dumps(
+                        {
+                            "type": "call.invite",
+                            "conversation_id": conversation["id"],
+                            "call_type": "video",
+                            "sdp": {"type": "offer", "sdp": "v=0\r\n"},
+                        }
+                    )
+                )
+                ringing = await next_event(bob_socket, "call.incoming")
+                check(ringing["data"]["call_type"] == "video", "an invite rings the other side")
+                check(
+                    ringing["data"]["caller"]["username"] == alice_name,
+                    "the invite names the caller",
+                )
+
+                await bob_socket.send(
+                    json.dumps(
+                        {
+                            "type": "call.accept",
+                            "conversation_id": conversation["id"],
+                            "sdp": {"type": "answer", "sdp": "v=0\r\n"},
+                        }
+                    )
+                )
+                answered = await next_event(alice_socket, "call.accepted")
+                check(answered["data"]["sdp"]["type"] == "answer", "the answer reaches the caller")
+
+                await bob_socket.send(
+                    json.dumps(
+                        {"type": "call.hangup", "conversation_id": conversation["id"]}
+                    )
+                )
+                ended = await next_event(alice_socket, "call.ended")
+                check(ended["data"]["reason"] == "hangup", "hanging up ends the call")
+
         print("\nGroups")
         async with websockets.connect(f"{WS_BASE}/ws?token={carol['access_token']}") as carol_socket:
             await next_event(carol_socket, "ready")

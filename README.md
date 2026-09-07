@@ -3,7 +3,8 @@
 A working Signal Messenger clone: a FastAPI backend with real-time WebSocket
 delivery, and a Next.js client that talks to it. Registration, sign-in, direct
 and group conversations, replies, edits, deletions, typing indicators, presence,
-delivery receipts and read state all work end to end against the real server.
+delivery receipts, read state, and one-to-one voice and video calls all work end
+to end against the real server.
 
 ## Status
 
@@ -16,11 +17,12 @@ delivery receipts and read state all work end to end against the real server.
 | REST API: auth, users, contacts, conversations, messages, groups | Done |
 | Authentication: bcrypt, JWT access tokens, rotating refresh tokens, lockout | Done |
 | WebSockets: messages, typing, presence, receipts, group events | Done |
+| Voice and video calls (WebRTC, one-to-one) | Done |
 | Development seed data | Done |
 | UI/UX design — tokens, design system, 21 screens | Done |
 | Frontend: auth, chat, groups, contacts, settings, dark mode, responsive | Done |
 
-**286 backend tests** and a **26-check end-to-end smoke test** against a live
+**301 backend tests** and a **30-check end-to-end smoke test** against a live
 server pass; CI runs both, plus the frontend typecheck and build, on every pull
 request.
 
@@ -122,12 +124,41 @@ access token. Full interactive documentation is at `/docs` when the server runs.
 | Conversations | `GET /api/conversations`, `POST /api/conversations/direct`, `GET /api/conversations/{id}`, `/members`, `/messages`, `POST .../read`, `PATCH .../mute` |
 | Messages | `PATCH/DELETE /api/messages/{id}` |
 | Groups | `POST /api/groups`, `PATCH /api/groups/{id}`, `POST/DELETE/PATCH .../members`, `POST .../leave` |
-| Realtime | `ws://…/ws?token=…` |
+| Realtime | `ws://…/ws?token=…` — messages, typing, presence, receipts, call signalling |
 
 The socket is a notification channel, not a second API: writes go over HTTP,
 where errors have status codes and retries are ordinary. It carries only what
 HTTP cannot push — other people's messages, typing, presence, receipts — plus
-the two acknowledgements a client must send without a round trip (typing, read).
+the acknowledgements a client must send without a round trip (typing, read) and
+call signalling, which has nowhere else to live.
+
+## Calls
+
+One-to-one voice and video, over WebRTC. The server relays two small JSON blobs
+— a session description and a stream of network candidates — and then gets out
+of the way: the audio and video flow directly between the two browsers and never
+touch the backend. That is why calls run at full quality on a free-tier instance
+that could never carry video itself.
+
+The microphone and camera are requested through `getUserMedia`, which is what
+raises the browser's permission prompt. It runs before any negotiation, because
+there is no point connecting a call someone cannot speak into, and each way it
+can fail — permission refused, no device, device already in use, insecure
+origin — is reported as something the person can act on rather than as the
+browser's own wording.
+
+Two limits are structural, not oversights:
+
+- **One-to-one only.** A group call needs a mesh of N×(N−1) peer connections or
+  a media server to mix the streams. The backend refuses group conversations
+  outright, and the UI hides the call buttons there, rather than half-connecting
+  three people.
+- **No TURN server.** Public STUN tells each browser its own public address,
+  which is enough on most home and office networks. Behind symmetric NAT or a
+  strict corporate firewall the two peers cannot address each other at all and
+  the media needs relaying through a TURN server, which costs bandwidth to run.
+  On such a network signalling succeeds and the media never connects; the client
+  reports that specifically instead of blaming the other person.
 
 ## Data model
 
@@ -210,8 +241,10 @@ Deliberate, and listed so they are not mistaken for oversights:
 - **Single process.** The socket registry is in memory, so a second worker
   would not see the first one's connections. `ConnectionManager.send_to_users`
   is the seam where a Redis pub/sub broker would slot in.
-- **Text only.** Attachments, voice notes and calls are not implemented; the
+- **Text messages only.** Attachments and voice notes are not implemented; the
   message type column is sized to accept them later without a schema change.
+- **Calls are not recorded or logged.** No call history, no missed-call entry in
+  the conversation — the server keeps no call state at all, by design.
 - **Phone verification and photo upload are placeholders**, shown in the UI and
   labelled as such.
 - **A free-tier deployment sleeps.** After 15 minutes without traffic the

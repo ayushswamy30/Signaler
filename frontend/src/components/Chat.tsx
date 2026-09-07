@@ -123,8 +123,9 @@ export function TypingIndicator({ name }: { name: string }) {
   );
 }
 
-export function ChatHeader({ conversation, meId, onOpenInfo }: {
+export function ChatHeader({ conversation, meId, onOpenInfo, onCall }: {
   conversation: Conversation; meId: number; onOpenInfo: () => void;
+  onCall?: (kind: "audio" | "video") => void;
 }) {
   const isGroup = conversation.type === "group";
   const online = !isGroup &&
@@ -141,8 +142,15 @@ export function ChatHeader({ conversation, meId, onOpenInfo }: {
         </p>
       </div>
       <div className="flex items-center gap-xs text-ink-muted">
-        <IconButton label="Start voice call" icon="phone" />
-        <IconButton label="Start video call" icon="video" />
+        {/* Hidden for groups rather than disabled: a group call needs a media
+            server to mix the streams, so there is nothing behind the button
+            and a greyed-out one would only be a dead end. */}
+        {!isGroup && (
+          <>
+            <IconButton label="Start voice call" icon="phone" onClick={() => onCall?.("audio")} />
+            <IconButton label="Start video call" icon="video" onClick={() => onCall?.("video")} />
+          </>
+        )}
         <IconButton label={isGroup ? "Group info" : "Contact info"} icon="info" onClick={onOpenInfo} />
       </div>
     </header>
