@@ -119,8 +119,11 @@ export default function AppPage() {
                     <MessageBubble message={m} mine={mine} first={first} last={last}
                       showSender={active.type === "group" && first} />
                     <button onClick={() => setReplyTo(m)} aria-label={`Reply to ${m.sender.displayName}`}
-                      className={clsx("absolute top-1 hidden rounded-md p-1 text-ink-faint",
-                        "hover:bg-hover hover:text-ink group-hover:block",
+                      className={clsx("absolute top-1 rounded-md p-1 text-ink-faint",
+                        // Hidden visually until hover, but reachable by keyboard:
+                        // opacity (not display) keeps it focusable, and focus reveals it.
+                        "opacity-0 transition-opacity hover:bg-hover hover:text-ink",
+                        "group-hover:opacity-100 focus-visible:opacity-100",
                         mine ? "left-[-30px]" : "right-[-30px]")}>
                       <Icon name="reply" size={15} />
                     </button>
