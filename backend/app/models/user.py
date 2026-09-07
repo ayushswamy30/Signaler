@@ -12,6 +12,7 @@ from app.models.types import UtcDateTime
 
 if TYPE_CHECKING:
     from app.models.contact import Contact
+    from app.models.conversation_participant import ConversationParticipant
 
 
 class User(TimestampMixin, Base):
@@ -67,6 +68,20 @@ class User(TimestampMixin, Base):
         back_populates="contact_user",
         foreign_keys="Contact.contact_user_id",
         cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # Deliberately no delete cascade: the foreign key is RESTRICT, so deleting
+    # a user who still participates in a conversation must fail rather than
+    # quietly removing them from it. A cascade here would delete the rows the
+    # database is trying to protect. passive_deletes stops SQLAlchemy loading
+    # them to NULL a primary-key column, letting the RESTRICT surface instead.
+    #
+    # No User.conversations shortcut: the association object carries role,
+    # joined_at and read state, so hiding it behind a many-to-many would only
+    # obscure the thing callers actually need.
+    conversation_participations: Mapped[list["ConversationParticipant"]] = relationship(
+        back_populates="user",
         passive_deletes=True,
     )
 

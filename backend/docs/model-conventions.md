@@ -223,3 +223,68 @@ Decisions worth knowing:
   stops `A → A` at the database level today; there is no CHECK constraint, and
   the model test documents that honestly rather than implying a guard that does
   not exist. The Contacts service must reject it when that layer is built.
+
+### Conversation and ConversationParticipant
+
+One `conversations` table serves both direct and group conversations,
+distinguished by `ConversationType` (`DIRECT` / `GROUP`). Separate tables would
+duplicate the participant, message and read-state machinery for no gain, since
+everything below a conversation is identical either way.
+
+**conversations**
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | int | Primary key |
+| `type` | `ConversationType` | Required; `direct` or `group` |
+| `name` | `String(100)` | Optional; groups are named, direct ones are labelled by the other participant |
+| `avatar_url` | `String(512)` | Optional |
+| `created_at` / `updated_at` | `UtcDateTime` | From `TimestampMixin` |
+
+**conversation_participants**
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `conversation_id` | int FK → `conversations.id` | Part of the primary key, `ON DELETE CASCADE` |
+| `user_id` | int FK → `users.id` | Part of the primary key, `ON DELETE RESTRICT`, indexed |
+| `role` | `ParticipantRole` | Required, defaults to `MEMBER` |
+| `joined_at` | `UtcDateTime` | When the user joined |
+| `last_read_message_id` | int | Nullable, **no foreign key yet** |
+
+Decisions worth knowing:
+
+- **Participants are an association object, not a plain many-to-many.** The
+  membership carries its own state — role, join time, read position — so there
+  is no `User.conversations` shortcut; hiding the association behind a
+  many-to-many would obscure the thing callers actually need.
+- **Composite primary key `(conversation_id, user_id)`**, the same pattern as
+  `Contact`: a user cannot join the same conversation twice, enforced by the
+  key rather than a separate unique constraint.
+- **Deleting a conversation cascades to its participants**; membership cannot
+  outlive its conversation.
+- **Deleting a user is RESTRICTed, not cascaded.** Removing an account must not
+  silently erase its membership of a group conversation, which is part of that
+  conversation's history for everyone else. The database refuses the delete
+  while membership exists, so account deletion has to be designed rather than
+  defaulting to destruction. **The account-deletion strategy (tombstone or soft
+  delete) is an open decision** — `User` was deliberately not changed here.
+- **`last_read_message_id` is a bare integer** until the `Message` model
+  exists. Adding a placeholder Message model just to satisfy the foreign key
+  would be worse than waiting; a later migration adds the reference to
+  `messages.id`.
+- **`user_id` is indexed.** The composite primary key already covers lookups
+  starting with `conversation_id` ("who is in this conversation?"), but not
+  ones starting with `user_id` ("every conversation this user is in") — the
+  query behind the conversation list, on the app's main screen.
+- **Direct-conversation uniqueness is a service-layer invariant.** Participants
+  live in a child table, so no column constraint can express "this pair
+  already has a direct conversation". The schema permits duplicates; the
+  `ConversationService` must look for an existing `DIRECT` conversation
+  containing exactly those two users before creating one. This is deliberate,
+  not an oversight, and a test records the current behaviour honestly.
+- **Conversation shape and group role rules are service-layer invariants too**
+  — that a direct conversation has exactly two participants, that a group has a
+  name, that a group keeps at least one admin. Encoding them in the schema
+  would make ordinary steps impossible, since a conversation must exist before
+  its participants can reference it. `ADMIN` and `MEMBER` are structural only;
+  no authorisation logic lives in the model.

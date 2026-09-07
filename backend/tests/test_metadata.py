@@ -37,14 +37,39 @@ def test_base_is_the_single_declarative_base() -> None:
     assert Base.registry.metadata is Base.metadata
 
 
+def _exported_models() -> dict[str, type]:
+    """The mapped classes app.models exports.
+
+    The package also exports enums used by those models (ConversationType,
+    ParticipantRole), which are not mapped and have no metadata, so they are
+    filtered out here rather than excluded from __all__.
+    """
+    exported = {name: getattr(app.models, name) for name in app.models.__all__}
+    return {
+        name: obj
+        for name, obj in exported.items()
+        if isinstance(obj, type) and hasattr(obj, "__tablename__")
+    }
+
+
 def test_model_package_is_importable_and_shares_the_base_metadata() -> None:
     assert hasattr(app.models, "__all__")
 
-    # Every name exported by the package must be a model on the shared metadata,
-    # which is what makes it visible to Alembic autogenerate.
-    for name in app.models.__all__:
-        model = getattr(app.models, name)
+    # Every exported model must sit on the shared metadata, which is what makes
+    # it visible to Alembic autogenerate.
+    for name, model in _exported_models().items():
         assert model.metadata is Base.metadata, f"{name} is not on the shared metadata"
+
+
+def test_every_registered_table_has_an_exported_model() -> None:
+    """Catches a model that reaches the metadata without being exported.
+
+    Such a model would migrate correctly but be invisible to callers importing
+    from app.models, so the two sets must match exactly.
+    """
+    exported_tables = {model.__tablename__ for model in _exported_models().values()}
+
+    assert exported_tables == set(Base.metadata.tables)
 
 
 def test_metadata_carries_the_naming_convention() -> None:
@@ -62,13 +87,23 @@ def test_registered_models_are_on_the_shared_metadata() -> None:
     a model added without being imported in app/models/__init__.py, or a table
     registered by accident, both show up here.
     """
-    assert set(Base.metadata.tables) == {"users", "contacts"}
+    assert set(Base.metadata.tables) == {
+        "users",
+        "contacts",
+        "conversations",
+        "conversation_participants",
+    }
 
 
 def test_models_are_registered() -> None:
-    from app.models import Contact, User
+    from app.models import Contact, Conversation, ConversationParticipant, User
 
-    for model, table_name in ((User, "users"), (Contact, "contacts")):
+    for model, table_name in (
+        (User, "users"),
+        (Contact, "contacts"),
+        (Conversation, "conversations"),
+        (ConversationParticipant, "conversation_participants"),
+    ):
         assert model.__name__ in app.models.__all__
         assert model.__tablename__ == table_name
         assert model.__table__ is Base.metadata.tables[table_name]
