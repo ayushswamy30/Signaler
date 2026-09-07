@@ -18,6 +18,7 @@ authentication and real-time delivery come in later stages.
 | Models: `Message`, `MessageStatus` | Done |
 | Database hardening: FK/index audit, cross-model integration tests | Done |
 | Authentication, services, API endpoints, WebSockets | Not started |
+| UI/UX design | In progress |
 | Frontend (Next.js) | Not started |
 
 149 tests pass; CI runs them on every pull request.
