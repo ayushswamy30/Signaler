@@ -51,6 +51,8 @@ const ICE_SERVERS: RTCIceServer[] = [
       "turn:openrelay.metered.ca:80",
       "turn:openrelay.metered.ca:443",
       "turn:openrelay.metered.ca:443?transport=tcp",
+      "turn:openrelay.metered.ca:3478",
+      "turn:openrelay.metered.ca:3478?transport=tcp",
     ],
     username: "openrelayproject",
     credential: "openrelayproject",
@@ -304,6 +306,7 @@ export function useCall() {
       };
 
       pc.onconnectionstatechange = () => {
+        console.info("[call] connection state:", pc.connectionState);
         if (pc.connectionState === "connected") {
           setCall((current) =>
             current.status === "active"
