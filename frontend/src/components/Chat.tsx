@@ -4,7 +4,7 @@ import { Icon } from "./Icon";
 import { Avatar, Badge } from "./Primitives";
 import type { Conversation, DeliveryStatus, Message } from "@/lib/types";
 import { formatListTime, formatTime, preview, subtitle, title } from "@/lib/format";
-import { stickerGlyphs } from "@/lib/emoji";
+import { parseSticker } from "@/lib/emoji";
 
 /** Status uses a distinct glyph per state — never colour alone (brief §6, §19). */
 export function MessageStatusIcon({ status, onAccent }: {
@@ -63,7 +63,7 @@ export function MessageBubble({ message, mine, showSender, first, last }: {
 
   // A reply carries context that matters more than the enlargement, so only
   // a plain message gets the sticker treatment.
-  const sticker = message.replyTo ? null : stickerGlyphs(message.content);
+  const sticker = message.replyTo ? null : parseSticker(message.content);
 
   return (
     <div className={clsx("flex", mine ? "justify-end" : "justify-start")}>
@@ -84,7 +84,7 @@ export function MessageBubble({ message, mine, showSender, first, last }: {
           </div>
         )}
         {sticker ? (
-          <p className="text-[56px] leading-none">{sticker.join("")}</p>
+          <p className="text-[56px] leading-none">{sticker}</p>
         ) : (
           <p className="whitespace-pre-wrap text-base">{message.content}</p>
         )}

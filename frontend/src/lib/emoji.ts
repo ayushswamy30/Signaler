@@ -17,35 +17,32 @@ export const COMMON_EMOJI: readonly string[] = [
   "🐶", "🐱", "🍕", "🍔", "☕", "🍺", "🎂", "⭐",
 ];
 
-/** Big, one-tap sends. The same pool that a message consisting only of these
- *  is enlarged to (see stickerGlyphs) -- surfaced here as one tap instead of
- *  a type-then-send. */
+/** Big, one-tap sends -- see markSticker/parseSticker for how a tap is told
+ *  apart from someone just typing the same glyph and hitting send. */
 export const STICKERS: readonly string[] = [
   "👍", "❤️", "😂", "🎉", "🔥", "👏", "😢", "😍",
   "🙏", "💯", "😮", "🥳", "🤔", "👀", "😎", "💪",
   "🙌", "✅", "❌", "🤷", "😅", "🤯", "🥰", "😭",
 ];
 
-const EMOJI_CHAR = /\p{Extended_Pictographic}/u;
-
-/** A message that is only emoji -- one to three of them, however they got
- *  typed -- is worth the "sticker" treatment: rendered oversized and without
- *  bubble chrome, the way every mainstream messenger renders it. Returns the
- *  grapheme clusters to render, or null when the message is ordinary text.
+/** Marks a sticker send in the plain-text `content` a message already is --
+ *  a zero-width character renders as nothing in every font, so the message
+ *  looks identical to the bare glyph everywhere it is displayed as text
+ *  (conversation previews, reply quotes, notifications).
  *
- *  `Intl.Segmenter` groups a multi-codepoint emoji (a skin tone modifier, a
- *  ZWJ family) into one cluster; every evergreen browser has it. Without it,
- *  code points are checked one at a time, which only misjudges those
- *  multi-part emoji and never the plain single-codepoint majority. */
-export function stickerGlyphs(content: string): string[] | null {
-  const text = content.trim();
-  if (!text || text.length > 32) return null;
+ *  The distinction has to live in the content itself, not be inferred from
+ *  it: an emoji-only message someone *typed* stays an ordinary small bubble,
+ *  and only a message actually sent from the sticker tray gets the
+ *  oversized, chrome-less treatment. Guessing from shape alone (an early
+ *  version of this did) made every short "👍" you typed indistinguishable
+ *  from a tapped sticker. */
+const STICKER_MARK = String.fromCharCode(8203); // U+200B zero-width space
 
-  const clusters = typeof Intl !== "undefined" && "Segmenter" in Intl
-    ? Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text),
-        (s) => s.segment)
-    : Array.from(text);
+export function markSticker(glyph: string): string {
+  return STICKER_MARK + glyph;
+}
 
-  if (clusters.length === 0 || clusters.length > 3) return null;
-  return clusters.every((glyph) => EMOJI_CHAR.test(glyph)) ? clusters : null;
+/** The glyph to render big, or null when `content` is an ordinary message. */
+export function parseSticker(content: string): string | null {
+  return content.startsWith(STICKER_MARK) ? content.slice(STICKER_MARK.length) : null;
 }

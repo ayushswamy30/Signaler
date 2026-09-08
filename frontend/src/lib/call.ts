@@ -294,6 +294,15 @@ export function useCall() {
         setCall((current) => ({ ...current, remoteStream: event.streams[0] ?? null }));
       };
 
+      // Not user-facing -- this is here so a call that still fails after the
+      // TURN fallback above can be diagnosed from one console log instead of
+      // another guess: "checking" stuck with no relay candidate means the
+      // TURN relay itself was unreachable; "connected" with silence points
+      // elsewhere entirely (a track/codec problem, not networking).
+      pc.oniceconnectionstatechange = () => {
+        console.info("[call] ICE state:", pc.iceConnectionState);
+      };
+
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === "connected") {
           setCall((current) =>

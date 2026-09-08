@@ -4,6 +4,7 @@ import { clsx } from "@/lib/clsx";
 import { Icon } from "./Icon";
 import { Spinner } from "./Primitives";
 import { EmojiPicker } from "./EmojiPicker";
+import { markSticker } from "@/lib/emoji";
 
 /** How long after the last keystroke the "still typing" signal stops.
  *  Slightly under the receiver's own expiry, so the indicator is refreshed
@@ -114,7 +115,7 @@ export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCance
     if (disabled || sending) return;
     setPickerOpen(false);
     stopTyping();
-    onSend(sticker);
+    onSend(markSticker(sticker));
   }
 
   return (

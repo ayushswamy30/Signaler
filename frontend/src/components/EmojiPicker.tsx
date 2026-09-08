@@ -37,11 +37,16 @@ export function EmojiPicker({ onPickEmoji, onPickSticker }: {
           </button>
         ))}
       </div>
-      <div role="menu" className="grid max-h-[260px] grid-cols-8 gap-[2px] overflow-y-auto p-sm">
+      {/* Stickers get visibly bigger tiles with a resting background -- a
+          one-tap send should not look like the same control as an emoji
+          that only augments whatever is being typed. */}
+      <div role="menu" className={clsx("grid max-h-[260px] gap-[6px] overflow-y-auto p-sm",
+        tab === "emoji" ? "grid-cols-8" : "grid-cols-6")}>
         {items.map((glyph, index) => (
           <button key={`${glyph}-${index}`} type="button" role="menuitem" aria-label={glyph}
             onClick={() => (tab === "emoji" ? onPickEmoji(glyph) : onPickSticker(glyph))}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-xl hover:bg-hover">
+            className={clsx("flex items-center justify-center rounded-md hover:bg-hover",
+              tab === "emoji" ? "h-9 w-9 text-xl" : "h-11 w-11 rounded-lg bg-hover text-2xl")}>
             {glyph}
           </button>
         ))}
