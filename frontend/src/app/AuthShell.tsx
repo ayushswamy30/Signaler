@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon } from "@/components/Icon";
+import { DitherCursor } from "@/components/DitherCursor";
 
 export function AuthShell({ title, subtitle, children, footer, width = 400 }: {
   title: string; subtitle: string; children: ReactNode; footer?: ReactNode; width?: number;
 }) {
   return (
     <main id="main" className="flex min-h-dvh items-center justify-center bg-canvas p-lg">
+      <DitherCursor />
       <div className="flex w-full flex-col gap-xl rounded-xl border border-line bg-surface p-2xl
         shadow-sm" style={{ maxWidth: width }}>
         <Link href="/" className="flex items-center gap-[10px] text-ink no-underline">
