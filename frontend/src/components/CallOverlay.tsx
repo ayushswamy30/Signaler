@@ -46,6 +46,32 @@ export function CallOverlay({ controller }: { controller: CallController }) {
   const localVideo = useStream(call.localStream);
   const remoteVideo = useStream(call.remoteStream);
   const elapsed = useElapsed(call.startedAt);
+  const [devicePickerOpen, setDevicePickerOpen] = useState(false);
+  const devicePickerBox = useRef<HTMLDivElement>(null);
+  // A new call starts this component back at "ringing"/"dialling" without
+  // ever unmounting it, so a picker left open from the last one would
+  // otherwise reappear already open.
+  useEffect(() => { if (call.status === "idle") setDevicePickerOpen(false); }, [call.status]);
+
+  // The ref spans both the toggle button and the popover, so a click on the
+  // button to close it does not also count as "outside" and reopen it.
+  useEffect(() => {
+    if (!devicePickerOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      if (devicePickerBox.current && !devicePickerBox.current.contains(event.target as Node)) {
+        setDevicePickerOpen(false);
+      }
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setDevicePickerOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [devicePickerOpen]);
 
   // A permission refusal or an unreachable peer is worth reporting even though
   // the call itself is over, so it renders on its own.
@@ -151,6 +177,15 @@ export function CallOverlay({ controller }: { controller: CallController }) {
           </>
         ) : (
           <>
+            <div className="relative" ref={devicePickerBox}>
+              <CallButton
+                label="Choose microphone and camera"
+                pressed={devicePickerOpen}
+                icon="devices"
+                onClick={() => setDevicePickerOpen((open) => !open)}
+              />
+              {devicePickerOpen && <DevicePicker controller={controller} showCamera={isVideo} />}
+            </div>
             <CallButton
               label={call.micOn ? "Mute microphone" : "Unmute microphone"}
               pressed={!call.micOn}
@@ -173,6 +208,50 @@ export function CallOverlay({ controller }: { controller: CallController }) {
   );
 }
 
+/** Which microphone and camera a call uses.
+ *
+ *  A popover rather than a settings page: switching mid-call is the moment
+ *  it is actually useful, when a call has just revealed that the wrong
+ *  device answered. */
+function DevicePicker({ controller, showCamera }: {
+  controller: CallController; showCamera: boolean;
+}) {
+  const { devices, micDeviceId, cameraDeviceId, setMicDevice, setCameraDevice } = controller;
+
+  return (
+    <div role="dialog" aria-label="Choose microphone and camera"
+      className="absolute bottom-full left-1/2 z-20 mb-md flex w-[240px] -translate-x-1/2 flex-col
+        gap-md rounded-lg border border-white/15 bg-[#141A21] p-md shadow-lg">
+      <DeviceSelect label="Microphone" value={micDeviceId} onChange={setMicDevice}
+        options={devices.mics} fallback="Microphone" />
+      {showCamera && (
+        <DeviceSelect label="Camera" value={cameraDeviceId} onChange={setCameraDevice}
+          options={devices.cameras} fallback="Camera" />
+      )}
+    </div>
+  );
+}
+
+function DeviceSelect({ label, value, onChange, options, fallback }: {
+  label: string; value: string; onChange: (id: string) => void;
+  options: MediaDeviceInfo[]; fallback: string;
+}) {
+  return (
+    <label className="flex flex-col gap-xs text-sm text-white">
+      <span className="text-white/60">{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}
+        className="rounded-md border border-white/15 bg-white/10 px-sm py-[6px] text-sm text-white">
+        <option className="text-black" value="">System default</option>
+        {options.map((device, index) => (
+          <option className="text-black" key={device.deviceId || index} value={device.deviceId}>
+            {device.label || `${fallback} ${index + 1}`}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function CallButton({
   label,
   icon,
@@ -181,7 +260,7 @@ function CallButton({
   pressed = false,
 }: {
   label: string;
-  icon: "phone" | "video" | "close" | "mute";
+  icon: "phone" | "video" | "close" | "mute" | "devices";
   onClick: () => void;
   tone?: "neutral" | "danger" | "accept";
   pressed?: boolean;

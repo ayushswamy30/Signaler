@@ -153,12 +153,15 @@ Two limits are structural, not oversights:
   a media server to mix the streams. The backend refuses group conversations
   outright, and the UI hides the call buttons there, rather than half-connecting
   three people.
-- **No TURN server.** Public STUN tells each browser its own public address,
-  which is enough on most home and office networks. Behind symmetric NAT or a
-  strict corporate firewall the two peers cannot address each other at all and
-  the media needs relaying through a TURN server, which costs bandwidth to run.
-  On such a network signalling succeeds and the media never connects; the client
-  reports that specifically instead of blaming the other person.
+- **TURN is a free relay, not a paid one.** Public STUN alone is enough on
+  most home and office networks, but not behind symmetric NAT or a strict
+  corporate/carrier firewall, where the two peers cannot address each other at
+  all and the media needs relaying through a TURN server — two ordinary phones
+  on two different mobile carriers hit this routinely. The client falls back
+  to Open Relay Project's free, keyless TURN server so those calls connect
+  rather than dying at "Connecting…" with no audio or video either way; its
+  bandwidth is shared and rate-limited, so a paid TURN provider is the
+  production-grade version of this same fix.
 
 ## Data model
 

@@ -87,7 +87,8 @@ export function PeopleSearchField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="flex-1 bg-transparent text-base outline-none placeholder:text-ink-faint"
+        className="flex-1 bg-transparent text-base outline-none placeholder:text-ink-faint
+          focus-visible:!outline-none"
       />
       {value && (
         <button type="button" onClick={() => onChange("")} aria-label="Clear search"
