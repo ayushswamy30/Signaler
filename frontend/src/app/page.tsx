@@ -17,7 +17,7 @@ import { NewGroupModal } from "@/components/NewGroupModal";
 import { ConversationInfo } from "@/components/ConversationInfo";
 import { CallOverlay } from "@/components/CallOverlay";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { DitherCursor } from "@/components/DitherCursor";
+import { CursorWave } from "@/components/CursorWave";
 import {
   ChatHeader,
   DateSeparator,
@@ -36,10 +36,12 @@ export default function AppPage() {
 }
 
 function BootScreen() {
+  const contentRef = useRef<HTMLDivElement>(null);
   return (
     <div className="flex h-dvh items-center justify-center bg-canvas">
-      <DitherCursor />
-      <div className="flex flex-col items-center gap-md" role="status" aria-label="Loading Signaler">
+      <CursorWave avoidRef={contentRef} />
+      <div ref={contentRef} className="flex flex-col items-center gap-md" role="status"
+        aria-label="Loading Signaler">
         <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-white">
           <Icon name="send" size={22} strokeWidth={1.9} />
         </span>
