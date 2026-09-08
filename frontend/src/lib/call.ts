@@ -111,6 +111,60 @@ function describeMediaError(error: unknown, kind: CallKind): string {
  *  that should normally end a call. */
 const STALL_LIMIT_MS = 30_000;
 
+interface CandidateReport { id: string; candidateType?: string }
+interface PairReport { localCandidateId: string; remoteCandidateId: string; state: string; nominated?: boolean }
+
+/** What ICE actually gathered and agreed on, printed when a call fails.
+ *
+ *  Every explanation for a failed call has been a guess so far because the
+ *  browser's own verdict ("failed") says nothing about *why*. These three
+ *  numbers separate the cases that need completely different fixes:
+ *
+ *  - no `relay` in gathered      -> TURN produced nothing: credentials
+ *                                   rejected, or its ports are blocked here.
+ *  - relay on both sides, no pair -> the relay works and the two ends still
+ *                                   cannot meet; a different relay is needed.
+ *  - a working pair, still failed -> not networking at all; look at DTLS or
+ *                                   the tracks. */
+async function reportIceFailure(pc: RTCPeerConnection): Promise<void> {
+  try {
+    const stats = await pc.getStats();
+    const candidates = new Map<string, CandidateReport>();
+    const pairs: PairReport[] = [];
+    const gathered = new Set<string>();
+    const received = new Set<string>();
+
+    stats.forEach((report) => {
+      const entry = report as unknown as CandidateReport & PairReport & { type: string };
+      if (entry.type === "local-candidate") {
+        candidates.set(entry.id, entry);
+        if (entry.candidateType) gathered.add(entry.candidateType);
+      } else if (entry.type === "remote-candidate") {
+        candidates.set(entry.id, entry);
+        if (entry.candidateType) received.add(entry.candidateType);
+      } else if (entry.type === "candidate-pair") {
+        pairs.push(entry);
+      }
+    });
+
+    const working = pairs.find((pair) => pair.state === "succeeded" || pair.nominated);
+    const describe = (id: string) => candidates.get(id)?.candidateType ?? "?";
+
+    console.warn("[call] why it failed:", {
+      gathered: [...gathered].join(", ") || "none",
+      received: [...received].join(", ") || "none",
+      workingPair: working
+        ? `${describe(working.localCandidateId)} -> ${describe(working.remoteCandidateId)}`
+        : "none",
+      pairsTried: pairs.length,
+      iceGathering: pc.iceGatheringState,
+      ice: pc.iceConnectionState,
+    });
+  } catch {
+    // Diagnostics must never be the thing that breaks a call.
+  }
+}
+
 const MIC_DEVICE_KEY = "signaler:call-mic";
 const CAMERA_DEVICE_KEY = "signaler:call-camera";
 
@@ -374,7 +428,12 @@ export function useCall() {
 
         if (pc.connectionState === "failed") {
           clearStall();
-          finish("Could not connect. One of you may be on a network that blocks direct calls.");
+          // Read the stats before finish() closes the connection out from
+          // under them -- getStats on a closed peer connection reports
+          // nothing, which is how a diagnostic silently becomes useless.
+          void reportIceFailure(pc).finally(() => {
+            finish("Could not connect. One of you may be on a network that blocks direct calls.");
+          });
         }
       };
 
