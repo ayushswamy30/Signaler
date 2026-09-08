@@ -106,7 +106,10 @@ export function CallOverlay({ controller }: { controller: CallController }) {
       : call.status === "ringing" ? `Incoming ${call.kind} call`
         : call.status === "connecting" ? "Connecting…"
           : call.status === "ended" ? "Call ended"
-            : elapsed ?? "Connected";
+            // A drop is worth saying out loud while it is being recovered --
+            // silence here reads as a call that has already died.
+            : call.reconnecting ? "Reconnecting…"
+              : elapsed ?? "Connected";
 
   return (
     <div

@@ -106,6 +106,11 @@ function describeMediaError(error: unknown, kind: CallKind): string {
   }
 }
 
+/** How long a call may sit in "disconnected" before it is given up on. Well
+ *  clear of the browser's own escalation to "failed", which is the signal
+ *  that should normally end a call. */
+const STALL_LIMIT_MS = 30_000;
+
 const MIC_DEVICE_KEY = "signaler:call-mic";
 const CAMERA_DEVICE_KEY = "signaler:call-camera";
 
@@ -160,6 +165,9 @@ interface CallSnapshot {
   remoteStream: MediaStream | null;
   micOn: boolean;
   cameraOn: boolean;
+  /** Connected, then the checks started failing. The call is still alive and
+   *  the browser is still trying -- worth saying so rather than hiding it. */
+  reconnecting: boolean;
   error: string | null;
   /** When the media actually connected, for the in-call timer. */
   startedAt: number | null;
@@ -174,6 +182,7 @@ const IDLE: CallSnapshot = {
   remoteStream: null,
   micOn: true,
   cameraOn: true,
+  reconnecting: false,
   error: null,
   startedAt: null,
 };
@@ -204,6 +213,8 @@ export function useCall() {
    *  addIceCandidate throws in that window, and the first candidates routinely
    *  beat the answer, so they are held and replayed rather than dropped. */
   const earlyCandidates = useRef<RTCIceCandidateInit[]>([]);
+  /** Counts down while a call sits in "disconnected". See startStall. */
+  const stallTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- devices -------------------------------------------------------------
 
@@ -243,6 +254,9 @@ export function useCall() {
    *  Stopping every track matters: a MediaStream that is merely dropped leaves
    *  the camera light on, which reads — correctly — as still being watched. */
   const teardown = useCallback(() => {
+    if (stallTimer.current) clearTimeout(stallTimer.current);
+    stallTimer.current = null;
+
     localStream.current?.getTracks().forEach((track) => track.stop());
     localStream.current = null;
 
@@ -252,6 +266,7 @@ export function useCall() {
       connection.current.onicecandidate = null;
       connection.current.ontrack = null;
       connection.current.onconnectionstatechange = null;
+      connection.current.oniceconnectionstatechange = null;
       connection.current.close();
       connection.current = null;
     }
@@ -276,7 +291,30 @@ export function useCall() {
     [teardown],
   );
 
-  /** Build the peer connection and wire its four callbacks. */
+  const clearStall = useCallback(() => {
+    if (stallTimer.current) clearTimeout(stallTimer.current);
+    stallTimer.current = null;
+  }, []);
+
+  /** The backstop under a call sitting in "disconnected".
+   *
+   *  Recovery is the browser's job -- it will either get the checks passing
+   *  again or escalate to "failed" -- and it is better at judging that than a
+   *  timer here would be. This exists only for the case where it does
+   *  neither, so a call cannot sit on "Reconnecting…" forever. */
+  const startStall = useCallback(
+    (pc: RTCPeerConnection) => {
+      if (stallTimer.current) return; // already counting down for this drop
+      stallTimer.current = setTimeout(() => {
+        stallTimer.current = null;
+        if (connection.current !== pc || pc.connectionState === "connected") return;
+        finish("The connection dropped and could not be recovered.");
+      }, STALL_LIMIT_MS);
+    },
+    [finish],
+  );
+
+  /** Build the peer connection and wire its callbacks. */
   const createConnection = useCallback(
     (forConversation: number) => {
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
@@ -307,28 +345,43 @@ export function useCall() {
 
       pc.onconnectionstatechange = () => {
         console.info("[call] connection state:", pc.connectionState);
+
         if (pc.connectionState === "connected") {
-          setCall((current) =>
-            current.status === "active"
-              ? current
-              : { ...current, status: "active", startedAt: Date.now() },
-          );
+          clearStall();
+          setCall((current) => ({
+            ...current,
+            status: "active",
+            reconnecting: false,
+            // Preserved across a recovery, or the in-call timer restarts at
+            // zero every time the network hiccups.
+            startedAt: current.startedAt ?? Date.now(),
+          }));
         }
+
+        // "disconnected" is WebRTC's word for "connectivity checks are
+        // failing *right now*", not "the call is over": the ICE agent is
+        // still trying, and it recovers on its own within a second or two
+        // routinely -- when a candidate pair flaps, or when the connection
+        // moves onto the relay pair. Ending the call here (which this did)
+        // killed the call the instant either side hiccuped, and, because
+        // finish() sends nothing to the peer, left the other end to die by
+        // itself and blame the network. The browser is the right judge of
+        // when checks have genuinely run out; that verdict is "failed".
+        if (pc.connectionState === "disconnected") {
+          setCall((current) => ({ ...current, reconnecting: true }));
+          startStall(pc);
+        }
+
         if (pc.connectionState === "failed") {
-          // Signalling worked and media did not: almost always a network that
-          // needs a TURN relay, so the message says so rather than blaming the
-          // other person's connection.
+          clearStall();
           finish("Could not connect. One of you may be on a network that blocks direct calls.");
-        }
-        if (pc.connectionState === "disconnected" || pc.connectionState === "closed") {
-          finish();
         }
       };
 
       connection.current = pc;
       return pc;
     },
-    [finish],
+    [finish, clearStall, startStall],
   );
 
   /** Open a fresh track of `kind` and put it in place of whatever this call is
@@ -566,13 +619,19 @@ export function useCall() {
           if (!pc) return;
           setCall((current) => ({ ...current, status: "connecting" }));
           void (async () => {
-            await pc.setRemoteDescription(
-              new RTCSessionDescription(data.sdp as RTCSessionDescriptionInit),
-            );
-            for (const candidate of earlyCandidates.current) {
-              await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            try {
+              await pc.setRemoteDescription(
+                new RTCSessionDescription(data.sdp as RTCSessionDescriptionInit),
+              );
+              for (const candidate of earlyCandidates.current) {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+              }
+              earlyCandidates.current = [];
+            } catch {
+              // Without this the answer silently fails to apply and the
+              // caller sits on "Connecting…" with nothing to act on.
+              finish("The call could not be set up. Try again.");
             }
-            earlyCandidates.current = [];
           })();
           break;
         }
