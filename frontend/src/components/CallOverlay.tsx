@@ -5,18 +5,24 @@
  *  Both are full-screen and sit above everything else, because a ringing phone
  *  that can be lost behind a window is a ringing phone you miss. */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { clsx } from "@/lib/clsx";
 import type { CallController } from "@/lib/call";
 import { Icon } from "./Icon";
 import { Avatar, Button } from "./Primitives";
 
-/** Attach a MediaStream to a <video>, and keep it attached as it changes.
+/** Attach a MediaStream to a <video> or <audio>, and keep it attached as it
+ *  changes.
+ *
+ *  Typed to `HTMLMediaElement` — the interface both share, and the one that
+ *  actually declares `srcObject` — rather than `HTMLVideoElement`, so the
+ *  same ref can be handed to either tag: a voice call has no picture to show
+ *  but still needs an element playing the remote audio back.
  *
  *  `srcObject` is a property, not an attribute, so React cannot set it from
  *  JSX — it has to be assigned imperatively. */
 function useStream(stream: MediaStream | null) {
-  const ref = useRef<HTMLVideoElement>(null);
+  const ref = useRef<HTMLMediaElement>(null);
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
@@ -124,13 +130,21 @@ export function CallOverlay({ controller }: { controller: CallController }) {
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
         {isVideo && call.remoteStream ? (
           <video
-            ref={remoteVideo}
+            ref={remoteVideo as RefObject<HTMLVideoElement>}
             autoPlay
             playsInline
             className="h-full w-full object-cover"
           />
         ) : (
           <div className="flex flex-col items-center gap-lg">
+            {/* A voice call has no picture, but still has a remote audio
+                track that needs an element to play through — without this
+                the call can connect perfectly and still be silent. Hidden
+                because it has no `controls` and nothing to show; it only
+                exists for its audio output. */}
+            {!isVideo && (
+              <audio ref={remoteVideo as RefObject<HTMLAudioElement>} autoPlay hidden />
+            )}
             <Avatar name={name} size={128} />
             <div className="flex flex-col items-center gap-xs">
               <p className="text-2xl font-semibold">{name}</p>
@@ -144,7 +158,7 @@ export function CallOverlay({ controller }: { controller: CallController }) {
             Muted, or you would hear yourself echo. */}
         {isVideo && call.localStream && (
           <video
-            ref={localVideo}
+            ref={localVideo as RefObject<HTMLVideoElement>}
             autoPlay
             playsInline
             muted

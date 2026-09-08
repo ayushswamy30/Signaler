@@ -31,6 +31,12 @@ export class SignalerSocket {
   /** Set when close() was called deliberately, so the reconnect loop stops. */
   private closed = false;
   private _state: SocketState = "closed";
+  /** Call-signalling messages held because the socket wasn't open when they
+   *  were sent, flushed in order the instant it reopens. Everything else
+   *  (typing, read receipts) is still dropped rather than queued -- see
+   *  send() -- but a lost call.accept or call.candidate breaks the whole
+   *  call, with nothing anywhere to notice or retry it. */
+  private pendingCallMessages: Record<string, unknown>[] = [];
 
   get state(): SocketState {
     return this._state;
@@ -61,6 +67,7 @@ export class SignalerSocket {
     socket.onopen = () => {
       this.attempt = 0;
       this.setState("open");
+      this.flushPendingCallMessages();
     };
 
     socket.onmessage = (event) => {
@@ -101,18 +108,35 @@ export class SignalerSocket {
   }
 
   send(payload: Record<string, unknown>) {
-    // Dropped rather than queued when the socket is down: every message this
-    // carries (typing, read receipts) is only meaningful right now, and a
-    // replayed backlog after a reconnect would be worse than silence.
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(payload));
+      return;
     }
+
+    // Call signalling can't just be dropped here: the socket is down for
+    // exactly as long as a reconnect takes (up to 15s, see RETRY_DELAYS),
+    // which is routinely reached by redeploys and ordinary drops alike, and
+    // losing a call.accept or call.candidate to that window silently breaks
+    // the call with no error anywhere. Everything else -- typing, read
+    // receipts -- is only meaningful right now, and a replayed backlog after
+    // a reconnect would be worse than silence, so that keeps being dropped.
+    if (typeof payload.type === "string" && payload.type.startsWith("call.")) {
+      this.pendingCallMessages.push(payload);
+    }
+  }
+
+  private flushPendingCallMessages() {
+    if (this.pendingCallMessages.length === 0) return;
+    const queued = this.pendingCallMessages;
+    this.pendingCallMessages = [];
+    for (const payload of queued) this.send(payload);
   }
 
   close() {
     this.closed = true;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
+    this.pendingCallMessages = [];
     this.socket?.close();
     this.socket = null;
     this.setState("closed");

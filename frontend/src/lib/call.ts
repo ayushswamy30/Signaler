@@ -654,9 +654,15 @@ export function useCall() {
           const id = data.conversation_id as number;
           const caller = toUser(data.caller as UserDTO);
 
-          // Already on a call: decline automatically. The server keeps no call
-          // state, so "busy" is something only this client can know.
-          if (connection.current) {
+          // Already on a call, or already ringing with one: decline
+          // automatically. The server keeps no call state, so "busy" is
+          // something only this client can know. connection.current alone
+          // isn't enough -- it stays null for the whole "ringing" phase,
+          // since createConnection() only ever runs from start()/accept();
+          // without the status check, a second incoming call while the
+          // first is still just ringing silently overwrote it instead of
+          // being declined.
+          if (connection.current || statusRef.current !== "idle") {
             socket.send({ type: "call.decline", conversation_id: id });
             return;
           }
@@ -675,7 +681,10 @@ export function useCall() {
 
         case "call.accepted": {
           const pc = connection.current;
-          if (!pc) return;
+          // Guards against an accept meant for a call that has already
+          // ended (this one hung up, or a fresh one started) landing on
+          // whatever connection happens to exist now.
+          if (!pc || data.conversation_id !== conversationId.current) return;
           setCall((current) => ({ ...current, status: "connecting" }));
           void (async () => {
             try {
@@ -696,6 +705,14 @@ export function useCall() {
         }
 
         case "call.candidate": {
+          // Checked before anything else: a candidate for a call that has
+          // already ended (this one hung up, or a fresh one started since)
+          // must never be queued at all, or it sits in earlyCandidates and
+          // gets replayed into the *next* call's connection instead --
+          // wrong ICE credentials, thrown addIceCandidate, a perfectly
+          // healthy new call torn down over a leftover from the last one.
+          if (data.conversation_id !== conversationId.current) return;
+
           const candidate = data.candidate as RTCIceCandidateInit;
           const pc = connection.current;
           // Held until there is a remote description to attach them to; the
