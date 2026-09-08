@@ -111,6 +111,7 @@ function Messenger() {
         loading={app.loading}
         onSelect={open}
         onNewMessage={() => setShowNew(true)}
+        onNewGroup={() => setShowNewGroup(true)}
         onSettings={() => router.push("/settings")}
         className={clsx(mobilePane === "chat" && "hidden md:flex")}
       />

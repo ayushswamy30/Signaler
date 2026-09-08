@@ -7,10 +7,10 @@ import { ConversationItem } from "./Chat";
 import { preview, title } from "@/lib/format";
 import type { Conversation, Me } from "@/lib/types";
 
-export function Sidebar({ me, conversations, activeId, onSelect, onNewMessage, onSettings,
+export function Sidebar({ me, conversations, activeId, onSelect, onNewMessage, onNewGroup, onSettings,
   loading = false, className }: {
   me: Me; conversations: Conversation[]; activeId: number | null;
-  onSelect: (id: number) => void; onNewMessage: () => void; onSettings: () => void;
+  onSelect: (id: number) => void; onNewMessage: () => void; onNewGroup: () => void; onSettings: () => void;
   loading?: boolean; className?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -34,6 +34,9 @@ export function Sidebar({ me, conversations, activeId, onSelect, onNewMessage, o
         <button onClick={onNewMessage} aria-label="New message"
           className="inline-flex h-11 w-11 items-center justify-center rounded-md text-ink-muted
             hover:bg-hover hover:text-ink md:h-8 md:w-8"><Icon name="edit" size={20} /></button>
+        <button onClick={onNewGroup} aria-label="New group"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md text-ink-muted
+            hover:bg-hover hover:text-ink md:h-8 md:w-8"><Icon name="users" size={20} /></button>
         <button onClick={onSettings} aria-label="Settings"
           className="inline-flex h-11 w-11 items-center justify-center rounded-md text-ink-muted
             hover:bg-hover hover:text-ink md:h-8 md:w-8"><Icon name="settings" size={20} /></button>
