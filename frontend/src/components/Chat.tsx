@@ -4,6 +4,7 @@ import { Icon } from "./Icon";
 import { Avatar, Badge } from "./Primitives";
 import type { Conversation, DeliveryStatus, Message } from "@/lib/types";
 import { formatListTime, formatTime, preview, subtitle, title } from "@/lib/format";
+import { stickerGlyphs } from "@/lib/emoji";
 
 /** Status uses a distinct glyph per state — never colour alone (brief §6, §19). */
 export function MessageStatusIcon({ status, onAccent }: {
@@ -59,11 +60,17 @@ export function MessageBubble({ message, mine, showSender, first, last }: {
   const radius = mine
     ? `${far} ${first ? far : near} ${last ? far : near} ${far}`
     : `${first ? far : near} ${far} ${far} ${last ? far : near}`;
+
+  // A reply carries context that matters more than the enlargement, so only
+  // a plain message gets the sticker treatment.
+  const sticker = message.replyTo ? null : stickerGlyphs(message.content);
+
   return (
     <div className={clsx("flex", mine ? "justify-end" : "justify-start")}>
-      <div className={clsx("max-w-[min(460px,78%)] px-md py-sm",
-          mine ? "bg-bubble-out text-bubble-outText" : "bg-bubble-in text-bubble-inText")}
-        style={{ borderRadius: radius }}>
+      <div className={clsx("max-w-[min(460px,78%)]",
+          sticker ? "bg-transparent" : clsx("px-md py-sm",
+            mine ? "bg-bubble-out text-bubble-outText" : "bg-bubble-in text-bubble-inText"))}
+        style={sticker ? undefined : { borderRadius: radius }}>
         {showSender && !mine && (
           <p className="mb-[2px] text-sm font-semibold text-accent">{message.sender.displayName}</p>
         )}
@@ -76,12 +83,18 @@ export function MessageBubble({ message, mine, showSender, first, last }: {
               {message.replyTo.content}</p>
           </div>
         )}
-        <p className="whitespace-pre-wrap text-base">{message.content}</p>
+        {sticker ? (
+          <p className="text-[56px] leading-none">{sticker.join("")}</p>
+        ) : (
+          <p className="whitespace-pre-wrap text-base">{message.content}</p>
+        )}
         <p className={clsx("mt-[2px] flex items-center justify-end gap-[5px] text-xs",
-          mine ? "text-white/75" : "text-ink-faint")}>
+          sticker ? "text-ink-faint" : mine ? "text-white/75" : "text-ink-faint")}>
           {message.editedAt && <span>edited</span>}
           <span>{formatTime(message.createdAt)}</span>
-          {mine && message.status && <MessageStatusIcon status={message.status} onAccent />}
+          {mine && message.status && (
+            <MessageStatusIcon status={message.status} onAccent={!sticker} />
+          )}
         </p>
       </div>
     </div>

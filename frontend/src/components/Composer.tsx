@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { clsx } from "@/lib/clsx";
 import { Icon } from "./Icon";
 import { Spinner } from "./Primitives";
+import { EmojiPicker } from "./EmojiPicker";
 
 /** How long after the last keystroke the "still typing" signal stops.
  *  Slightly under the receiver's own expiry, so the indicator is refreshed
@@ -22,7 +23,28 @@ export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCance
 }) {
   const [value, setValue] = useState(initialValue);
   const [sending, setSending] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const canSend = value.trim().length > 0 && !disabled && !sending;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Spans the smile button and the popover, so a click on the button to
+  // close it does not also read as "outside" and reopen it.
+  const pickerBox = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (pickerBox.current && !pickerBox.current.contains(e.target as Node)) setPickerOpen(false);
+    }
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.key === "Escape") setPickerOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [pickerOpen]);
 
   // Tracked in a ref rather than state: it changes on every keystroke and must
   // not cause a render, and the timer callback needs the current value.
@@ -70,6 +92,31 @@ export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCance
     if (e.key === "Escape" && onCancelReply) onCancelReply();
   }
 
+  /** Insert at the caret rather than appending, so picking an emoji mid-word
+   *  lands where the person was actually typing. */
+  function insertEmoji(emoji: string) {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    setValue(value.slice(0, start) + emoji + value.slice(end));
+    noteTyping();
+    // The caret restore has to wait for the value above to reach the DOM.
+    requestAnimationFrame(() => {
+      const caret = start + emoji.length;
+      el?.focus();
+      el?.setSelectionRange(caret, caret);
+    });
+  }
+
+  /** A sticker is the whole message: send it as-is rather than dropping it
+   *  into whatever was already being typed. */
+  function sendSticker(sticker: string) {
+    if (disabled || sending) return;
+    setPickerOpen(false);
+    stopTyping();
+    onSend(sticker);
+  }
+
   return (
     <form onSubmit={submit}
       className={clsx("border-t border-line bg-surface px-lg pb-lg pt-md md:px-xl", disabled && "opacity-60")}>
@@ -96,15 +143,19 @@ export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCance
         <div className="flex min-h-11 flex-1 items-end gap-[10px] rounded-[22px] border border-line
           bg-hover px-lg py-[9px] focus-within:border-line-focus">
           <label htmlFor="composer" className="sr-only">Message</label>
-          <textarea id="composer" rows={1} value={value} disabled={disabled}
+          <textarea id="composer" ref={textareaRef} rows={1} value={value} disabled={disabled}
             onChange={(e) => { setValue(e.target.value); noteTyping(); }} onKeyDown={onKeyDown}
             placeholder="Message"
             className="max-h-[120px] flex-1 resize-none bg-transparent text-base outline-none
-              placeholder:text-ink-faint" />
+              placeholder:text-ink-faint focus-visible:!outline-none" />
           <button type="button" aria-label="Attach a file"
             className="text-ink-faint hover:text-ink"><Icon name="clip" size={19} /></button>
-          <button type="button" aria-label="Insert emoji"
-            className="text-ink-faint hover:text-ink"><Icon name="smile" size={19} /></button>
+          <div className="relative" ref={pickerBox}>
+            <button type="button" aria-label="Insert emoji" aria-expanded={pickerOpen}
+              onClick={() => setPickerOpen((open) => !open)}
+              className="text-ink-faint hover:text-ink"><Icon name="smile" size={19} /></button>
+            {pickerOpen && <EmojiPicker onPickEmoji={insertEmoji} onPickSticker={sendSticker} />}
+          </div>
         </div>
         <button type="submit" disabled={!canSend} aria-label="Send message"
           className={clsx("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors",

@@ -29,15 +29,32 @@ export type CallStatus =
   | "active"
   | "ended";
 
-/** Public STUN only. STUN just tells a browser its own public address, which is
- *  enough for the great majority of home and office networks. It is *not*
- *  enough behind symmetric NAT or a strict corporate firewall, where the two
- *  peers cannot address each other at all and the media needs relaying through
- *  a TURN server. Running one costs bandwidth, so there is none here, and a
- *  call on such a network will connect its signalling and then fail to carry
- *  media — which `onconnectionstatechange` reports as `failed`. */
+/** STUN tells a browser its own public address, which is enough for most home
+ *  and office networks. It is *not* enough behind symmetric NAT or a strict
+ *  corporate/carrier firewall, where the two peers cannot address each other
+ *  at all and the media needs relaying through a TURN server — signalling
+ *  succeeds, `onconnectionstatechange` never leaves "connecting" or flips
+ *  straight to `failed`, and no audio or video crosses in either direction.
+ *  That is not a rare edge case: two ordinary phones on two different mobile
+ *  carriers hit it routinely.
+ *
+ *  Open Relay Project (metered.ca) is a free, keyless TURN relay meant for
+ *  exactly this gap. Its bandwidth is rate-limited and shared with everyone
+ *  using the same public credentials, so it is a fallback path, not a
+ *  guarantee — a paid TURN provider (credentials from an env var, injected at
+ *  build time like `NEXT_PUBLIC_API_URL`) is the production-grade version of
+ *  this same fix. */
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  {
+    urls: [
+      "turn:openrelay.metered.ca:80",
+      "turn:openrelay.metered.ca:443",
+      "turn:openrelay.metered.ca:443?transport=tcp",
+    ],
+    username: "openrelayproject",
+    credential: "openrelayproject",
+  },
 ];
 
 /** Why calling cannot work here at all, or null if it can.
@@ -87,6 +104,50 @@ function describeMediaError(error: unknown, kind: CallKind): string {
   }
 }
 
+const MIC_DEVICE_KEY = "signaler:call-mic";
+const CAMERA_DEVICE_KEY = "signaler:call-camera";
+
+/** The device picker remembers a choice across calls (and reloads), but only
+ *  as a nicety -- a private window or storage disabled by policy just means
+ *  the choice does not survive, not a broken picker. */
+function readStoredDevice(key: string): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredDevice(key: string, value: string) {
+  if (typeof window === "undefined") return;
+  try {
+    if (value) window.localStorage.setItem(key, value);
+    else window.localStorage.removeItem(key);
+  } catch {
+    // Ignored -- see readStoredDevice.
+  }
+}
+
+/** `""` means "system default", which is also what a browser does with a
+ *  bare `audio: true`. An empty deviceId is never sent as a constraint. */
+function buildAudioConstraint(deviceId: string): MediaTrackConstraints | boolean {
+  return deviceId ? { deviceId: { exact: deviceId } } : true;
+}
+
+function buildVideoConstraint(deviceId: string): MediaTrackConstraints {
+  return {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+  };
+}
+
+interface CallDevices {
+  mics: MediaDeviceInfo[];
+  cameras: MediaDeviceInfo[];
+}
+
 interface CallSnapshot {
   status: CallStatus;
   kind: CallKind;
@@ -123,6 +184,14 @@ export function useCall() {
   const statusRef = useRef<CallStatus>("idle");
   statusRef.current = call.status;
 
+  // Same reason: read inside switchDevice, which is created once (stable
+  // deps) and must still see this call's current mute state, not the one
+  // from whenever the track it is replacing was first captured.
+  const micOnRef = useRef(true);
+  micOnRef.current = call.micOn;
+  const cameraOnRef = useRef(true);
+  cameraOnRef.current = call.cameraOn;
+
   // WebRTC objects are mutable and long-lived, and must not trigger renders.
   const connection = useRef<RTCPeerConnection | null>(null);
   const localStream = useRef<MediaStream | null>(null);
@@ -133,6 +202,39 @@ export function useCall() {
    *  addIceCandidate throws in that window, and the first candidates routinely
    *  beat the answer, so they are held and replayed rather than dropped. */
   const earlyCandidates = useRef<RTCIceCandidateInit[]>([]);
+
+  // --- devices -------------------------------------------------------------
+
+  const [devices, setDevices] = useState<CallDevices>({ mics: [], cameras: [] });
+  const [micDeviceId, setMicDeviceIdState] = useState(() => readStoredDevice(MIC_DEVICE_KEY));
+  const [cameraDeviceId, setCameraDeviceIdState] = useState(() => readStoredDevice(CAMERA_DEVICE_KEY));
+  // Read inside captureMedia/switchDevice, which must see the preference in
+  // effect *right now* -- including one just chosen in the same event handler,
+  // before the state update above has re-rendered.
+  const micDeviceRef = useRef(micDeviceId);
+  const cameraDeviceRef = useRef(cameraDeviceId);
+
+  /** Device labels are blank until permission has been granted at least once,
+   *  so this is re-run after every capture, not just on mount. */
+  const refreshDevices = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      setDevices({
+        mics: all.filter((d) => d.kind === "audioinput"),
+        cameras: all.filter((d) => d.kind === "videoinput"),
+      });
+    } catch {
+      // Enumeration itself is not essential -- the picker just stays empty.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshDevices();
+    const media = navigator.mediaDevices;
+    media?.addEventListener?.("devicechange", refreshDevices);
+    return () => media?.removeEventListener?.("devicechange", refreshDevices);
+  }, [refreshDevices]);
 
   /** Release the camera, microphone and peer connection.
    *
@@ -217,6 +319,75 @@ export function useCall() {
     [finish],
   );
 
+  /** Open a fresh track of `kind` and put it in place of whatever this call is
+   *  currently sending.
+   *
+   *  Two callers share this: a track's own `onended` -- fired when its device
+   *  disappears mid-call (unplugged, revoked, put to sleep) -- and the device
+   *  menu, when the person picks a different one on purpose. `deviceId`
+   *  defaults to the stored preference so recovery always reopens *that*
+   *  device, not whichever one happened to answer first.
+   *
+   *  If nothing answers -- the unplugged device had no sibling, or the newly
+   *  chosen one stopped responding -- the call does not end over it; the
+   *  corresponding control just reads "off", exactly as if the person had
+   *  turned it off themselves. */
+  const switchDevice = useCallback(async (
+    kind: "audio" | "video",
+    pc: RTCPeerConnection,
+    deviceId?: string,
+  ) => {
+    if (connection.current !== pc) return; // this call has already ended
+    const stream = localStream.current;
+    if (!stream) return;
+
+    const id = deviceId ?? (kind === "audio" ? micDeviceRef.current : cameraDeviceRef.current);
+    const wasEnabled = kind === "audio" ? micOnRef.current : cameraOnRef.current;
+
+    try {
+      const fresh = await navigator.mediaDevices.getUserMedia(
+        kind === "audio"
+          ? { audio: buildAudioConstraint(id) }
+          : { video: buildVideoConstraint(id) },
+      );
+      const newTrack = fresh.getTracks()[0];
+      newTrack.enabled = wasEnabled;
+
+      const sender = pc.getSenders().find((s) => s.track?.kind === kind);
+      await sender?.replaceTrack(newTrack);
+
+      for (const old of stream.getTracks().filter((t) => t.kind === kind)) {
+        stream.removeTrack(old);
+        old.stop();
+      }
+      stream.addTrack(newTrack);
+      // Recovery always chases the stored preference, not this specific id --
+      // if the device that just answered disappears too, the next attempt
+      // should still try the one the person actually asked for.
+      newTrack.onended = () => void switchDevice(kind, pc);
+      void refreshDevices();
+    } catch {
+      setCall((current) =>
+        kind === "audio" ? { ...current, micOn: false } : { ...current, cameraOn: false });
+    }
+  }, [refreshDevices]);
+
+  /** Remember a device choice and, if a call is live, switch to it now rather
+   *  than on the next call. */
+  const setMicDevice = useCallback((id: string) => {
+    writeStoredDevice(MIC_DEVICE_KEY, id);
+    micDeviceRef.current = id;
+    setMicDeviceIdState(id);
+    if (connection.current) void switchDevice("audio", connection.current, id);
+  }, [switchDevice]);
+
+  const setCameraDevice = useCallback((id: string) => {
+    writeStoredDevice(CAMERA_DEVICE_KEY, id);
+    cameraDeviceRef.current = id;
+    setCameraDeviceIdState(id);
+    if (connection.current) void switchDevice("video", connection.current, id);
+  }, [switchDevice]);
+
   /** Ask for the microphone (and camera), and add the tracks to the call.
    *
    *  This is the call that raises the browser's permission prompt, so it is
@@ -224,14 +395,18 @@ export function useCall() {
    *  point negotiating a call that the person then cannot speak into. */
   const captureMedia = useCallback(async (kind: CallKind, pc: RTCPeerConnection) => {
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: kind === "video" ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
+      audio: buildAudioConstraint(micDeviceRef.current),
+      video: kind === "video" ? buildVideoConstraint(cameraDeviceRef.current) : false,
     });
     localStream.current = stream;
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+    stream.getTracks().forEach((track) => {
+      pc.addTrack(track, stream);
+      track.onended = () => void switchDevice(track.kind as "audio" | "video", pc);
+    });
+    void refreshDevices(); // labels are only populated once permission is granted
     setCall((current) => ({ ...current, localStream: stream, micOn: true, cameraOn: true }));
     return stream;
-  }, []);
+  }, [refreshDevices, switchDevice]);
 
   /** Place a call. */
   const start = useCallback(
@@ -434,7 +609,10 @@ export function useCall() {
   // A call must not outlive the page, or the camera stays on after navigation.
   useEffect(() => teardown, [teardown]);
 
-  return { call, start, accept, decline, hangup, toggleMic, toggleCamera, dismissError };
+  return {
+    call, start, accept, decline, hangup, toggleMic, toggleCamera, dismissError,
+    devices, micDeviceId, cameraDeviceId, setMicDevice, setCameraDevice,
+  };
 }
 
 export type CallController = ReturnType<typeof useCall>;
