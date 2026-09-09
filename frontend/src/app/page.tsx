@@ -17,7 +17,9 @@ import { NewGroupModal } from "@/components/NewGroupModal";
 import { ConversationInfo } from "@/components/ConversationInfo";
 import { CallOverlay } from "@/components/CallOverlay";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { CursorWave } from "@/components/CursorWave";
+import { LightTunnel } from "@/components/LightTunnel";
+import { useIsDarkTheme } from "@/lib/theme";
+import { TUNNEL_COLORS } from "@/lib/tunnelTheme";
 import {
   ChatHeader,
   DateSeparator,
@@ -37,10 +39,14 @@ export default function AppPage() {
 
 function BootScreen() {
   const contentRef = useRef<HTMLDivElement>(null);
+  const isDark = useIsDarkTheme();
   return (
     <div className="flex h-dvh items-center justify-center bg-canvas">
-      <CursorWave avoidRef={contentRef} />
-      <div ref={contentRef} className="flex flex-col items-center gap-md" role="status"
+      <LightTunnel {...TUNNEL_COLORS[isDark ? "dark" : "light"]} lightMode={!isDark} />
+      {/* relative + z-10: the tunnel is a fixed z-0 layer, which paints above
+          plain static siblings, so this needs its own stacking context to
+          land on top of it. */}
+      <div ref={contentRef} className="relative z-10 flex flex-col items-center gap-md" role="status"
         aria-label="Loading Signaler">
         <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-white">
           <Icon name="send" size={22} strokeWidth={1.9} />
