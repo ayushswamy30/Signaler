@@ -3,8 +3,8 @@
 A working Signal Messenger clone: a FastAPI backend with real-time WebSocket
 delivery, and a Next.js client that talks to it. Registration, sign-in, direct
 and group conversations, replies, edits, deletions, typing indicators, presence,
-delivery receipts, read state, and one-to-one voice and video calls all work end
-to end against the real server.
+delivery receipts, read state, emoji and stickers, and one-to-one voice and
+video calls all work end to end against the real server.
 
 ## Status
 
@@ -17,7 +17,8 @@ to end against the real server.
 | REST API: auth, users, contacts, conversations, messages, groups | Done |
 | Authentication: bcrypt, JWT access tokens, rotating refresh tokens, lockout | Done |
 | WebSockets: messages, typing, presence, receipts, group events | Done |
-| Voice and video calls (WebRTC, one-to-one) | Done |
+| Voice and video calls (WebRTC, one-to-one, TURN fallback) | Done |
+| Emoji picker and sticker sends | Done |
 | Development seed data | Done |
 | UI/UX design — tokens, design system, 21 screens | Done |
 | Frontend: auth, chat, groups, contacts, settings, dark mode, responsive | Done |
@@ -66,9 +67,11 @@ live.
 ```
 frontend/
   src/app/          routes: chat, login, register, verify, settings
-  src/components/   Avatar, Button, MessageBubble, Composer, Sidebar, Modal,
-                    PeoplePicker, ConversationInfo
-  src/lib/          api client, socket, auth context, state hook, adapters
+  src/components/   Avatar, Button, Chat, Composer, Sidebar, Modal, CallOverlay,
+                    PeoplePicker, ConversationInfo, EmojiPicker, CursorWave,
+                    Icon, ThemeToggle, NewGroupModal, NewMessageModal
+  src/lib/          api client, socket, auth context, state hook, adapters,
+                    call (WebRTC), emoji/sticker logic, DTO types, formatting
 backend/
   app/
     main.py         application setup: CORS, routers, lifespan
@@ -78,7 +81,7 @@ backend/
     services/       business logic — the layer that owns the rules
     models/         SQLAlchemy models
     database/       engine, session factory, declarative Base
-    websocket/      connection registry, event vocabulary, /ws endpoint
+    websocket/      connection registry, event vocabulary, call signalling, /ws endpoint
     seed.py         development data
   alembic/          migration environment and versions
   scripts/          smoke_e2e.py — live-server end-to-end test
@@ -132,6 +135,13 @@ HTTP cannot push — other people's messages, typing, presence, receipts — plu
 the acknowledgements a client must send without a round trip (typing, read) and
 call signalling, which has nowhere else to live.
 
+The socket reconnects automatically with exponential backoff (500 ms to 15 s).
+Call-signalling messages sent while the socket is down are queued and flushed in
+order when it reopens, because a lost `call.accept` or `call.candidate` silently
+breaks a call with no way to detect or retry. Everything else — typing and read
+receipts — is dropped rather than queued, since a replayed backlog of stale
+indicators would be worse than silence.
+
 ## Calls
 
 One-to-one voice and video, over WebRTC. The server relays two small JSON blobs
@@ -147,21 +157,50 @@ can fail — permission refused, no device, device already in use, insecure
 origin — is reported as something the person can act on rather than as the
 browser's own wording.
 
+ICE diagnostic reporting prints exactly what was gathered, received, and
+nominated when a call fails, separating the three distinct causes (TURN
+credentials rejected, relay works but peers still can't meet, or a non-network
+problem) so a failure has a reason rather than just "failed". Transient
+`disconnected` states — common on mobile — are tolerated for up to 30 seconds
+before ending the call, and each new call tears down the previous peer
+connection cleanly so stale ICE candidates from an earlier session cannot
+contaminate a fresh one.
+
 Two limits are structural, not oversights:
 
 - **One-to-one only.** A group call needs a mesh of N×(N−1) peer connections or
   a media server to mix the streams. The backend refuses group conversations
   outright, and the UI hides the call buttons there, rather than half-connecting
   three people.
-- **TURN is a free relay, not a paid one.** Public STUN alone is enough on
-  most home and office networks, but not behind symmetric NAT or a strict
+- **TURN needs a real, working relay.** Public STUN alone is enough on most
+  home and office networks, but not behind symmetric NAT or a strict
   corporate/carrier firewall, where the two peers cannot address each other at
-  all and the media needs relaying through a TURN server — two ordinary phones
-  on two different mobile carriers hit this routinely. The client falls back
-  to Open Relay Project's free, keyless TURN server so those calls connect
-  rather than dying at "Connecting…" with no audio or video either way; its
-  bandwidth is shared and rate-limited, so a paid TURN provider is the
-  production-grade version of this same fix.
+  all and the media needs relaying through a TURN server — two people on two
+  different home networks hit this routinely, and it surfaces as "Call
+  failed — Could not connect" rather than "Connecting…" forever, since the
+  browser eventually gives up and reports `failed`. `GET /api/calls/ice-servers`
+  (`app/services/call_service.py`) fetches short-lived TURN credentials from
+  Metered.ca on the backend rather than shipping a static shared secret in the
+  client bundle, so a credential rotation or provider swap takes effect on the
+  next call with no redeploy. Without `METERED_TURN_DOMAIN` /
+  `METERED_TURN_API_KEY` set, or if the provider is unreachable, the endpoint
+  degrades to Google's public STUN only, so calls keep working wherever STUN
+  alone is enough rather than the endpoint itself erroring.
+
+## Emoji and stickers
+
+The composer has a curated emoji picker and a sticker tray, hand-rolled rather
+than a multi-megabyte package (keeping with the rest of the UI, where every icon
+is a hand-drawn SVG — see `Icon.tsx`). Emoji augment whatever is being typed:
+picking one inserts it at the cursor and leaves the picker open for more. A
+sticker *is* the message — picking one sends it immediately and closes the
+picker, the way a sticker tray works in every mainstream messenger.
+
+The distinction between a sticker send and an emoji-only message someone typed is
+carried in the message content itself (a zero-width space prefix, invisible in
+every display context) rather than inferred from shape, because an earlier
+version that guessed made every short "👍" indistinguishable from a tapped
+sticker.
 
 ## Data model
 
@@ -246,6 +285,7 @@ Deliberate, and listed so they are not mistaken for oversights:
   is the seam where a Redis pub/sub broker would slot in.
 - **Text messages only.** Attachments and voice notes are not implemented; the
   message type column is sized to accept them later without a schema change.
+  Emoji and stickers are plain-text messages.
 - **Calls are not recorded or logged.** No call history, no missed-call entry in
   the conversation — the server keeps no call state at all, by design.
 - **Phone verification and photo upload are placeholders**, shown in the UI and

@@ -11,6 +11,7 @@
 import type {
   ContactDTO,
   ConversationDTO,
+  IceServersDTO,
   MeDTO,
   MessageDTO,
   MessagePageDTO,
@@ -270,4 +271,6 @@ export const api = {
 
   leaveGroup: (id: number) =>
     request<{ detail: string }>(`/api/groups/${id}/leave`, { method: "POST" }),
+
+  iceServers: () => request<IceServersDTO>("/api/calls/ice-servers"),
 };

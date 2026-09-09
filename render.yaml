@@ -66,3 +66,13 @@ services:
       # vercel.app is escaped, so it matches this project's deployments only.
       - key: CORS_ORIGIN_REGEX
         value: ^https://signaler-[a-z0-9-]+\.vercel\.app$
+
+      # TURN relay for calls where STUN alone cannot connect the two peers
+      # (see app/services/call_service.py). From a Metered.ca dashboard; set
+      # in the dashboard rather than committed, same as the API key it is.
+      # Left unset, calls still work wherever STUN alone is enough -- only
+      # the TURN fallback is missing.
+      - key: METERED_TURN_DOMAIN
+        sync: false
+      - key: METERED_TURN_API_KEY
+        sync: false
