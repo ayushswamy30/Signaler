@@ -88,3 +88,15 @@ export interface SocketEvent<T = Record<string, unknown>> {
   type: string;
   data: T;
 }
+
+/** Field names match the browser's RTCIceServer dictionary exactly, so a
+ *  response entry is a valid RTCIceServer with no renaming. */
+export interface IceServerDTO {
+  urls: string | string[];
+  username: string | null;
+  credential: string | null;
+}
+
+export interface IceServersDTO {
+  ice_servers: IceServerDTO[];
+}

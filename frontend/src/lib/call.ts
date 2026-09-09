@@ -13,6 +13,7 @@
  *  group conversations outright rather than half-connecting three people. */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "./api";
 import { socket } from "./socket";
 import { toUser } from "./adapt";
 import type { UserDTO } from "./dto";
@@ -36,28 +37,50 @@ export type CallStatus =
  *  succeeds, `onconnectionstatechange` never leaves "connecting" or flips
  *  straight to `failed`, and no audio or video crosses in either direction.
  *  That is not a rare edge case: two ordinary phones on two different mobile
- *  carriers hit it routinely.
+ *  carriers, or two people on two different home networks, hit it routinely.
  *
- *  Open Relay Project (metered.ca) is a free, keyless TURN relay meant for
- *  exactly this gap. Its bandwidth is rate-limited and shared with everyone
- *  using the same public credentials, so it is a fallback path, not a
- *  guarantee — a paid TURN provider (credentials from an env var, injected at
- *  build time like `NEXT_PUBLIC_API_URL`) is the production-grade version of
- *  this same fix. */
-const ICE_SERVERS: RTCIceServer[] = [
+ *  The actual server list is fetched from the backend (see fetchIceServers)
+ *  rather than hardcoded here, because a TURN credential needs to be able to
+ *  rotate — or a dead provider needs to be swappable for a working one —
+ *  without a frontend redeploy. This is only the offline fallback: Google's
+ *  public STUN, free and keyless, used if the backend itself cannot be
+ *  reached. It has no TURN entry, so a call that needs relaying will still
+ *  fail in that specific case — but signalling and every STUN-reachable call
+ *  keeps working instead of an unrelated network hiccup blocking calls
+ *  outright. */
+const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-  {
-    urls: [
-      "turn:openrelay.metered.ca:80",
-      "turn:openrelay.metered.ca:443",
-      "turn:openrelay.metered.ca:443?transport=tcp",
-      "turn:openrelay.metered.ca:3478",
-      "turn:openrelay.metered.ca:3478?transport=tcp",
-    ],
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
 ];
+
+/** How long a fetched ICE server list is reused before asking the backend
+ *  again. Long enough that placing several calls in a row does not refetch
+ *  every time; short enough that a rotated or newly-configured TURN
+ *  credential reaches an open tab within a session rather than only on
+ *  reload. */
+const ICE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let iceCache: { servers: RTCIceServer[]; fetchedAt: number } | null = null;
+
+/** The ICE servers for the next call: cached, with a network or server
+ *  failure degrading to STUN-only rather than blocking the call from being
+ *  attempted at all. */
+async function fetchIceServers(): Promise<RTCIceServer[]> {
+  if (iceCache && Date.now() - iceCache.fetchedAt < ICE_CACHE_TTL_MS) {
+    return iceCache.servers;
+  }
+  try {
+    const { ice_servers } = await api.iceServers();
+    const servers: RTCIceServer[] = ice_servers.map((entry) => ({
+      urls: entry.urls,
+      username: entry.username ?? undefined,
+      credential: entry.credential ?? undefined,
+    }));
+    iceCache = { servers, fetchedAt: Date.now() };
+    return servers;
+  } catch {
+    return FALLBACK_ICE_SERVERS;
+  }
+}
 
 /** Why calling cannot work here at all, or null if it can.
  *
@@ -368,10 +391,14 @@ export function useCall() {
     [finish],
   );
 
-  /** Build the peer connection and wire its callbacks. */
+  /** Build the peer connection and wire its callbacks.
+   *
+   *  Async because the ICE server list is fetched (and cached) rather than
+   *  hardcoded — see fetchIceServers. */
   const createConnection = useCallback(
-    (forConversation: number) => {
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    async (forConversation: number) => {
+      const iceServers = await fetchIceServers();
+      const pc = new RTCPeerConnection({ iceServers });
 
       pc.onicecandidate = (event) => {
         // A null candidate means gathering has finished; there is nothing to
@@ -547,7 +574,7 @@ export function useCall() {
       conversationId.current = conversation.id;
 
       try {
-        const pc = createConnection(conversation.id);
+        const pc = await createConnection(conversation.id);
         await captureMedia(kind, pc);
 
         const offer = await pc.createOffer();
@@ -582,7 +609,7 @@ export function useCall() {
     setCall((current) => ({ ...current, status: "connecting" }));
 
     try {
-      const pc = createConnection(id);
+      const pc = await createConnection(id);
       await captureMedia(call.kind, pc);
 
       await pc.setRemoteDescription(new RTCSessionDescription(offer));

@@ -68,6 +68,16 @@ class Settings(BaseSettings):
     # database for an unbounded result set.
     max_page_size: int = 100
 
+    # TURN relay for calls that STUN alone cannot connect (symmetric NAT, a
+    # strict corporate/carrier firewall -- see /api/calls/ice-servers). Both
+    # are the values from a Metered.ca dashboard: the per-account subdomain
+    # ("yourapp.metered.ca") and its API key. Left blank, the endpoint still
+    # returns Google's public STUN servers, so calls keep working everywhere
+    # STUN alone is enough -- only the TURN fallback is missing, and it fails
+    # the way "Could not connect" describes rather than 500ing.
+    metered_turn_domain: str = ""
+    metered_turn_api_key: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         """Allowed CORS origins parsed from the comma-separated setting."""

@@ -172,15 +172,20 @@ Two limits are structural, not oversights:
   a media server to mix the streams. The backend refuses group conversations
   outright, and the UI hides the call buttons there, rather than half-connecting
   three people.
-- **TURN is a free relay, not a paid one.** Public STUN alone is enough on
-  most home and office networks, but not behind symmetric NAT or a strict
+- **TURN needs a real, working relay.** Public STUN alone is enough on most
+  home and office networks, but not behind symmetric NAT or a strict
   corporate/carrier firewall, where the two peers cannot address each other at
-  all and the media needs relaying through a TURN server — two ordinary phones
-  on two different mobile carriers hit this routinely. The client falls back
-  to Open Relay Project's free, keyless TURN server so those calls connect
-  rather than dying at "Connecting…" with no audio or video either way; its
-  bandwidth is shared and rate-limited, so a paid TURN provider is the
-  production-grade version of this same fix.
+  all and the media needs relaying through a TURN server — two people on two
+  different home networks hit this routinely, and it surfaces as "Call
+  failed — Could not connect" rather than "Connecting…" forever, since the
+  browser eventually gives up and reports `failed`. `GET /api/calls/ice-servers`
+  (`app/services/call_service.py`) fetches short-lived TURN credentials from
+  Metered.ca on the backend rather than shipping a static shared secret in the
+  client bundle, so a credential rotation or provider swap takes effect on the
+  next call with no redeploy. Without `METERED_TURN_DOMAIN` /
+  `METERED_TURN_API_KEY` set, or if the provider is unreachable, the endpoint
+  degrades to Google's public STUN only, so calls keep working wherever STUN
+  alone is enough rather than the endpoint itself erroring.
 
 ## Emoji and stickers
 

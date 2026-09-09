@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api import auth, contacts, conversations, groups, health, messages, users
+from app.api import auth, calls, contacts, conversations, groups, health, messages, users
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
@@ -12,3 +12,4 @@ api_router.include_router(contacts.router)
 api_router.include_router(conversations.router)
 api_router.include_router(messages.router)
 api_router.include_router(groups.router)
+api_router.include_router(calls.router)
