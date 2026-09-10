@@ -239,7 +239,15 @@ export function useMessenger(me: Me) {
     async (name: string, memberIds: number[]) => {
       try {
         const conversation = toConversation(await api.createGroup({ name, member_ids: memberIds }));
-        setConversations((current) => sortConversations([conversation, ...current]));
+        // The creator is a participant, so the "conversation.created" broadcast
+        // reaches this same device too -- and can arrive before this HTTP
+        // response does, since the server sends it right after committing the
+        // row. Filtering out any existing id before prepending (the same guard
+        // startDirect and applyConversation already use) is what keeps that
+        // race from leaving the new group in the list twice.
+        setConversations((current) =>
+          sortConversations([conversation, ...current.filter((c) => c.id !== conversation.id)]),
+        );
         openConversation(conversation.id);
         return conversation;
       } catch (problem) {
