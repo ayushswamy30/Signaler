@@ -30,7 +30,16 @@ services:
     # Migrations run on start rather than during the build: the build has no
     # database attached, and `alembic upgrade head` is idempotent, so a restart
     # or a second instance is harmless.
-    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    #
+    # `seed.py --ensure` runs the same way, for the same reason: it creates
+    # whichever of the seven demo accounts the README advertises are missing
+    # and touches nothing else, so it is safe to repeat on every boot. Without
+    # it, the demo database has none of them -- `seed()`'s normal, destructive
+    # path never runs here (see app/seed.py's `_guard`), and the deployed
+    # database is never empty for long, so its own "already has users" no-op
+    # would otherwise leave the documented logins broken permanently the
+    # moment the first visitor signs up.
+    startCommand: alembic upgrade head && python -m app.seed --ensure && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     # Render restarts the instance if this stops answering.
     healthCheckPath: /api/health
     envVars:

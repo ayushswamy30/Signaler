@@ -143,6 +143,44 @@ def _create_people(db: Session) -> dict[str, User]:
     return users
 
 
+def ensure_demo_accounts(db: Session) -> list[str]:
+    """Create whichever of the seven demo accounts are missing, and no more.
+
+    ``seed()`` is the right tool for a developer's empty database -- it also
+    builds contacts, conversations and history, and refuses to touch anything
+    but a fresh table. It is the wrong tool for the deployed demo: that
+    database is never empty (the moment anyone signs up, ``seed()``'s "table
+    already has users" check makes it a permanent no-op), and there is no
+    development guard to run it under. The two documented ways to get the
+    demo accounts -- run ``seed()`` locally, or nothing at all in production --
+    left the deployed instance with none of the seven the README advertises.
+
+    This does the minimum instead: for each of the seven usernames, create it
+    with the standard seed password if, and only if, that exact username does
+    not already exist. A real person who has since registered as e.g.
+    ``ayush`` is left completely alone -- their account, and anyone who has
+    since messaged them, are not this function's business. Safe to run
+    unconditionally on every boot, including production: it never deletes,
+    resets or edits an existing row, so running it against an already-seeded
+    or partially-seeded database changes nothing.
+    """
+    created: list[str] = []
+    for username, display_name, phone, about in PEOPLE:
+        if user_service.find_by_username(db, username) is not None:
+            continue
+        user = user_service.create_user(
+            db,
+            username=username,
+            password=SEED_PASSWORD,
+            display_name=display_name,
+            phone_number=phone,
+        )
+        if about:
+            user_service.update_profile(db, user, about=about)
+        created.append(username)
+    return created
+
+
 def _link_contacts(db: Session, users: dict[str, User]) -> None:
     """Everyone saves everyone else.
 
@@ -275,11 +313,28 @@ def main() -> None:
     parser.add_argument(
         "--reset", action="store_true", help="delete existing data before seeding"
     )
+    parser.add_argument(
+        "--ensure",
+        action="store_true",
+        help=(
+            "create only whichever of the seven demo accounts are missing, touching "
+            "nothing else. Additive and idempotent, so unlike the default mode it is "
+            "allowed to run outside development -- see ensure_demo_accounts()."
+        ),
+    )
     args = parser.parse_args()
 
-    _guard()
     db = SessionLocal()
     try:
+        if args.ensure:
+            created = ensure_demo_accounts(db)
+            if created:
+                print(f"Created missing demo accounts: {', '.join(created)}.")
+            else:
+                print("All seven demo accounts already exist; nothing to do.")
+            return
+
+        _guard()
         if seed(db, reset=args.reset):
             print(
                 f"Seeded {len(PEOPLE)} accounts. Sign in as any username above "
