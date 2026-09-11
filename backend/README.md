@@ -176,19 +176,29 @@ people's conversations.
 like on the wire, and who its audience is.
 
 `calls.py` is the call-signalling relay. It forwards a session description and
-network candidates between two people who already share a direct conversation,
-and stores nothing: a ringing table held in memory would be lost on every
-restart and would be wrong the moment a second worker existed. So "is the other
-person reachable" is answered from live socket presence, and "am I already on a
-call" is answered by the client, which is the only party that knows.
+network candidates between people who already share a conversation, and stores
+nothing: a ringing table held in memory would be lost on every restart and would
+be wrong the moment a second worker existed. So "is the other person reachable"
+is answered from live socket presence, "who is in this call" is answered by the
+clients announcing themselves to each other, and "am I already on a call" is
+answered by the client, which is the only party that knows.
+
+A one-to-one call folds its whole negotiation into the invite and the accept,
+because there is only one pair. A group call is a mesh, so the invite rings
+everybody and carries no offer, an accept is fanned out to the whole
+conversation as `call.joined`, and the per-pair frames (`call.offer`,
+`call.answer`, `call.candidate`) are *addressed* — `target_user_id` says which
+peer they belong to, and it is checked against the membership list rather than
+trusted.
 
 Three rules it enforces, each for a reason:
 
 - **Membership is re-checked on every frame**, not just on the invite. Without
   that, anyone who learned a conversation id could inject candidates into a call
   between two other people, or hang it up.
-- **Direct conversations only.** A group call needs a mesh of peer connections
-  or a media server; failing clearly beats half-connecting three people.
+- **A named target must be a real participant.** Group frames carry a
+  `target_user_id`; without that check a member could push candidates at any
+  account whose id they could guess.
 - **Payloads are size-capped and never parsed.** SDP and candidate shapes are
   the browser's business, and interpreting them here would add a version
   dependency; the cap stops the channel being used to push arbitrary data

@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { clsx } from "@/lib/clsx";
-import type { CallController } from "@/lib/call";
+import type { CallController, CallParticipant } from "@/lib/call";
 import { Icon } from "./Icon";
 import { Avatar, Button } from "./Primitives";
 
@@ -50,7 +50,10 @@ export function CallOverlay({ controller }: { controller: CallController }) {
   const { call, accept, decline, hangup, toggleMic, toggleCamera, dismissError } = controller;
 
   const localVideo = useStream(call.localStream);
-  const remoteVideo = useStream(call.remoteStream);
+  // One-to-one only. A group call has a stream per person, each attached by
+  // the tile that renders it.
+  const remoteStream = call.isGroup ? null : call.participants[0]?.stream ?? null;
+  const remoteVideo = useStream(remoteStream);
   const elapsed = useElapsed(call.startedAt);
   const [devicePickerOpen, setDevicePickerOpen] = useState(false);
   const devicePickerBox = useRef<HTMLDivElement>(null);
@@ -121,14 +124,20 @@ export function CallOverlay({ controller }: { controller: CallController }) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${call.kind === "video" ? "Video" : "Voice"} call with ${name}`}
+      aria-label={
+        call.isGroup
+          ? `Group ${call.kind === "video" ? "video" : "voice"} call`
+          : `${call.kind === "video" ? "Video" : "Voice"} call with ${name}`
+      }
       className="fixed inset-0 z-[60] flex flex-col bg-[#0B0F14] text-white"
     >
       {/* The remote video fills the screen once it arrives. Until then — and
           for every voice call — an avatar stands in, so the layout never jumps
           between an empty black rectangle and a face. */}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden">
-        {isVideo && call.remoteStream ? (
+        {call.isGroup ? (
+          <GroupStage call={call} name={name} statusLine={statusLine} />
+        ) : isVideo && remoteStream ? (
           <video
             ref={remoteVideo as RefObject<HTMLVideoElement>}
             autoPlay
@@ -172,7 +181,7 @@ export function CallOverlay({ controller }: { controller: CallController }) {
 
         {/* When video is running, the name moves to a banner so it does not
             cover the picture. */}
-        {isVideo && call.remoteStream && (
+        {isVideo && remoteStream && (
           <div className="absolute left-lg top-lg flex flex-col gap-[2px] rounded-lg
             bg-black/45 px-lg py-md backdrop-blur">
             <p className="text-lg font-semibold">{name}</p>
@@ -220,6 +229,84 @@ export function CallOverlay({ controller }: { controller: CallController }) {
             <CallButton label="Hang up" tone="danger" icon="close" onClick={hangup} />
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** The in-call view for a group: one tile per person, plus your own.
+ *
+ *  A grid rather than the one-to-one screen's full-bleed video, because in a
+ *  group there is no single "other end" to fill the screen with, and a layout
+ *  that promoted one person would have to demote everybody else on some basis
+ *  the call itself does not have. The columns follow the count, so two people
+ *  are side by side and five are not five slivers. */
+function GroupStage({ call, name, statusLine }: {
+  call: CallController["call"]; name: string; statusLine: string;
+}) {
+  const isVideo = call.kind === "video";
+  const people = call.participants;
+
+  // Ringing, or nobody has answered yet: there is no grid to show, so this
+  // falls back to the same single-avatar screen a one-to-one call uses. The
+  // caller is the one name worth showing at this point.
+  if (people.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-lg">
+        <Avatar name={name} size={128} />
+        <div className="flex flex-col items-center gap-xs">
+          <p className="text-2xl font-semibold">{name}</p>
+          <p aria-live="polite" className="text-lg text-white/70">
+            {call.status === "dialling" ? "Waiting for someone to join…" : statusLine}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const columns = people.length <= 1 ? 1 : people.length <= 4 ? 2 : 3;
+
+  return (
+    <div className="flex h-full w-full flex-col gap-md p-md">
+      <p aria-live="polite" className="text-center text-md text-white/70">{statusLine}</p>
+      <div
+        className="grid flex-1 gap-md"
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+      >
+        {people.map((person) => (
+          <PeerTile key={person.user.id} person={person} isVideo={isVideo} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** One person in a group call.
+ *
+ *  Every tile carries its own media element even in a voice call: the audio
+ *  track has to be attached to something to be heard, and in a mesh there is
+ *  one track per person rather than one for the call. */
+function PeerTile({ person, isVideo }: { person: CallParticipant; isVideo: boolean }) {
+  const media = useStream(person.stream);
+  const showVideo = isVideo && person.stream !== null;
+
+  return (
+    <div className="relative flex min-h-[120px] items-center justify-center overflow-hidden
+      rounded-lg bg-white/5">
+      {showVideo ? (
+        <video ref={media as RefObject<HTMLVideoElement>} autoPlay playsInline
+          className="h-full w-full object-cover" />
+      ) : (
+        <>
+          <audio ref={media as RefObject<HTMLAudioElement>} autoPlay hidden />
+          <Avatar name={person.user.displayName} size={72} />
+        </>
+      )}
+
+      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between gap-sm
+        bg-black/45 px-md py-sm backdrop-blur">
+        <p className="truncate text-sm font-medium">{person.user.displayName}</p>
+        {!person.connected && <p className="shrink-0 text-sm text-white/70">Connecting…</p>}
       </div>
     </div>
   );

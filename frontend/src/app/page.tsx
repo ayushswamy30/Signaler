@@ -56,7 +56,7 @@ function Messenger() {
   const { user } = useAuth();
   const me = user!;
   const app = useMessenger(me);
-  const calls = useCall();
+  const calls = useCall(me.id);
 
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [showNew, setShowNew] = useState(false);
@@ -95,11 +95,12 @@ function Messenger() {
 
   const unread = active?.unreadCount ?? 0;
 
-  /** Start a call with the other person in the open conversation. */
+  /** Start a call in the open conversation. */
   function startCall(kind: CallKind) {
     if (!active) return;
-    const other = counterpart(active, me.id);
-    if (other) void calls.start(active, other, kind);
+    // A group has no single counterpart: the invite rings everyone in it, and
+    // whoever answers joins the same call.
+    void calls.start(active, counterpart(active, me.id) ?? null, kind);
   }
 
   return (
