@@ -31,13 +31,18 @@ TYPING_STOP = "typing.stop"
 
 PRESENCE = "presence"
 
-# Call signalling. The server relays these between two peers and stores none of
+# Call signalling. The server relays these between peers and stores none of
 # them; see app/websocket/calls.py.
 CALL_INCOMING = "call.incoming"
 CALL_ACCEPTED = "call.accepted"
 CALL_CANDIDATE = "call.candidate"
 CALL_ENDED = "call.ended"
 CALL_UNAVAILABLE = "call.unavailable"
+# Group calls only. A group call is a mesh: every pair negotiates its own
+# connection, so "someone joined" is separate from "here is an offer for you".
+CALL_JOINED = "call.joined"
+CALL_PEER_OFFER = "call.peer_offer"
+CALL_PEER_ANSWER = "call.peer_answer"
 
 CONVERSATION_CREATED = "conversation.created"
 CONVERSATION_UPDATED = "conversation.updated"

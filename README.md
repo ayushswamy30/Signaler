@@ -3,7 +3,7 @@
 A working Signal Messenger clone: a FastAPI backend with real-time WebSocket
 delivery, and a Next.js client that talks to it. Registration, sign-in, direct
 and group conversations, replies, edits, deletions, typing indicators, presence,
-delivery receipts, read state, emoji and stickers, and one-to-one voice and
+delivery receipts, read state, emoji and stickers, and voice and
 video calls all work end to end against the real server.
 
 ## Status
@@ -17,7 +17,7 @@ video calls all work end to end against the real server.
 | REST API: auth, users, contacts, conversations, messages, groups | Done |
 | Authentication: bcrypt, JWT access tokens, rotating refresh tokens, lockout | Done |
 | WebSockets: messages, typing, presence, receipts, group events | Done |
-| Voice and video calls (WebRTC, one-to-one, TURN fallback) | Done |
+| Voice and video calls (WebRTC, one-to-one and group mesh, TURN fallback) | Done |
 | Emoji picker and sticker sends | Done |
 | Development seed data | Done |
 | UI/UX design — tokens, design system, 21 screens | Done |
@@ -144,11 +144,21 @@ indicators would be worse than silence.
 
 ## Calls
 
-One-to-one voice and video, over WebRTC. The server relays two small JSON blobs
-— a session description and a stream of network candidates — and then gets out
-of the way: the audio and video flow directly between the two browsers and never
-touch the backend. That is why calls run at full quality on a free-tier instance
-that could never carry video itself.
+Voice and video, over WebRTC, in one-to-one chats and in groups. The server
+relays two small JSON blobs — a session description and a stream of network
+candidates — and then gets out of the way: the audio and video flow directly
+between the browsers and never touch the backend. That is why calls run at full
+quality on a free-tier instance that could never carry video itself.
+
+A group call is a **mesh**: every pair of people in it negotiates its own
+connection, so a call of N people is N×(N−1)/2 connections and each person
+uploads their camera N−1 times. Which side of a pair sends the offer is settled
+without any server state — the lower user id offers — and someone who learns of
+a peer they are not responsible for offering re-announces themselves instead, so
+each pair ends up connecting exactly once, in one direction, with no glare.
+The server holds no call state at all: "who is in this call" is something the
+members tell each other, which is why an accept is fanned out to the whole
+conversation rather than to the caller alone.
 
 The microphone and camera are requested through `getUserMedia`, which is what
 raises the browser's permission prompt. It runs before any negotiation, because
@@ -168,10 +178,12 @@ contaminate a fresh one.
 
 Two limits are structural, not oversights:
 
-- **One-to-one only.** A group call needs a mesh of N×(N−1) peer connections or
-  a media server to mix the streams. The backend refuses group conversations
-  outright, and the UI hides the call buttons there, rather than half-connecting
-  three people.
+- **The mesh suits small groups, not large ones.** Every extra person costs
+  every existing participant another upload of their own camera, so a group
+  call degrades with size in a way a one-to-one call does not. Past a handful
+  of people the right answer is a media server (an SFU) that receives each
+  stream once and forwards it — which is exactly the server cost this design
+  avoids, and out of scope here.
 - **TURN needs a real, working relay.** Public STUN alone is enough on most
   home and office networks, but not behind symmetric NAT or a strict
   corporate/carrier firewall, where the two peers cannot address each other at
@@ -186,6 +198,10 @@ Two limits are structural, not oversights:
   `METERED_TURN_API_KEY` set, or if the provider is unreachable, the endpoint
   degrades to Google's public STUN only, so calls keep working wherever STUN
   alone is enough rather than the endpoint itself erroring.
+
+The mesh protocol, the rule that decides which side of each pair offers, and
+how all of it was verified are written up in
+[docs/group-calls.md](docs/group-calls.md).
 
 ## Emoji and stickers
 
@@ -287,7 +303,12 @@ Deliberate, and listed so they are not mistaken for oversights:
   message type column is sized to accept them later without a schema change.
   Emoji and stickers are plain-text messages.
 - **Calls are not recorded or logged.** No call history, no missed-call entry in
-  the conversation — the server keeps no call state at all, by design.
+  the conversation — the server keeps no call state at all, by design. It also
+  means a group call in progress is not advertised anywhere: someone who
+  declines cannot re-join without a fresh invite.
+- **Group calls have no participant cap.** The mesh suits the handful of people
+  a group chat here actually holds; nothing yet stops one being placed in a
+  group far too large for it.
 - **Phone verification and photo upload are placeholders**, shown in the UI and
   labelled as such.
 - **A free-tier deployment sleeps.** After 15 minutes without traffic the

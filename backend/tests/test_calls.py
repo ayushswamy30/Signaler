@@ -134,25 +134,141 @@ def test_an_outsider_cannot_signal_into_a_conversation(live, alice, bob, carol, 
         assert intruder.receive_json()["type"] == "error"
 
 
-def test_a_group_conversation_refuses_calls(live, alice, bob, carol, token_for, db_session):
-    """Failing clearly beats half-connecting three people.
-
-    A group call needs either a mesh of peer connections or a media server;
-    both are out of scope, so the server says so instead of relaying an offer
-    to one arbitrary member.
-    """
-    group = group_service.create_group(
+@pytest.fixture
+def team(db_session: Session, alice, bob, carol):
+    """A group conversation with alice, bob and carol in it."""
+    return group_service.create_group(
         db_session, creator_id=alice.id, name="Team", member_ids=[bob.id, carol.id]
     )
+
+
+def test_a_group_invite_rings_everyone_else(live, alice, bob, carol, token_for, team):
+    """One invite, every other member. A group call is not a call to one person
+    who happens to be in a group -- everyone's device has to ring, and each one
+    that answers negotiates its own connection."""
+    with live.websocket_connect(f"/ws?token={token_for(bob)}") as first:
+        _drain_ready(first)
+        with live.websocket_connect(f"/ws?token={token_for(carol)}") as second:
+            _drain_ready(second)
+            with live.websocket_connect(f"/ws?token={token_for(alice)}") as caller:
+                _drain_ready(caller)
+                caller.send_json({
+                    "type": "call.invite",
+                    "conversation_id": team.id,
+                    "call_type": "video",
+                })
+
+                for ringing in (first, second):
+                    frame = _await_event(ringing, "call.incoming")
+                    assert frame["data"]["is_group"] is True
+                    assert frame["data"]["call_type"] == "video"
+                    assert frame["data"]["caller"]["username"] == "alice"
+                    # No offer: there is a different one for every pair, and
+                    # neither exists until somebody answers.
+                    assert "sdp" not in frame["data"]
+
+
+def test_joining_a_group_call_is_announced_to_everyone(live, alice, bob, carol, token_for, team):
+    """The server holds no call state, so "who is in this call" is something
+    the members tell each other. An accept therefore reaches the whole
+    conversation, not just whoever placed the call."""
+    with live.websocket_connect(f"/ws?token={token_for(alice)}") as caller:
+        _drain_ready(caller)
+        with live.websocket_connect(f"/ws?token={token_for(carol)}") as third:
+            _drain_ready(third)
+            with live.websocket_connect(f"/ws?token={token_for(bob)}") as joiner:
+                _drain_ready(joiner)
+                joiner.send_json({"type": "call.accept", "conversation_id": team.id})
+
+                for listener in (caller, third):
+                    frame = _await_event(listener, "call.joined")
+                    assert frame["data"]["participant"]["username"] == "bob"
+                    assert frame["data"]["conversation_id"] == team.id
+
+
+def test_a_group_offer_goes_only_to_the_peer_it_names(live, alice, bob, carol, token_for, team):
+    """A mesh negotiates pair by pair, so these frames are addressed. Carol is
+    in the same call and must not receive bob's offer -- hers is different."""
+    with live.websocket_connect(f"/ws?token={token_for(bob)}") as target:
+        _drain_ready(target)
+        with live.websocket_connect(f"/ws?token={token_for(carol)}") as bystander:
+            _drain_ready(bystander)
+            with live.websocket_connect(f"/ws?token={token_for(alice)}") as caller:
+                _drain_ready(caller)
+                caller.send_json({
+                    "type": "call.offer",
+                    "conversation_id": team.id,
+                    "target_user_id": bob.id,
+                    "call_type": "audio",
+                    "sdp": OFFER,
+                })
+                frame = _await_event(target, "call.peer_offer")
+                assert frame["data"]["sdp"] == OFFER
+                assert frame["data"]["peer"]["username"] == "alice"
+
+                target.send_json({
+                    "type": "call.answer",
+                    "conversation_id": team.id,
+                    "target_user_id": alice.id,
+                    "sdp": ANSWER,
+                })
+                back = _await_event(caller, "call.peer_answer")
+                assert back["data"]["sdp"] == ANSWER
+                assert back["data"]["peer"]["username"] == "bob"
+
+                # Carol saw neither. Anything she did receive would mean the
+                # mesh was leaking one pair's negotiation into another.
+                bystander.send_json({"type": "call.hangup", "conversation_id": team.id})
+                assert _await_event(caller, "call.ended")["data"]["from_user_id"] == carol.id
+
+
+def test_a_group_frame_must_name_a_real_participant(live, alice, bob, token_for, team, carol):
+    """The target is checked against the membership list rather than trusted:
+    otherwise a member could push candidates at any account they could name."""
+    outsider = 99_999
+    with live.websocket_connect(f"/ws?token={token_for(alice)}") as caller:
+        _drain_ready(caller)
+        for target in (outsider, None, alice.id):
+            caller.send_json({
+                "type": "call.candidate",
+                "conversation_id": team.id,
+                "target_user_id": target,
+                "candidate": CANDIDATE,
+            })
+            frame = _await_event(caller, "error")
+            assert "target_user_id" in frame["data"]["detail"]
+
+
+def test_leaving_a_group_call_reaches_everyone(live, alice, bob, carol, token_for, team):
+    """One person leaving a group call is not the call ending, but every other
+    client still has a connection to that person to tear down."""
+    with live.websocket_connect(f"/ws?token={token_for(bob)}") as first:
+        _drain_ready(first)
+        with live.websocket_connect(f"/ws?token={token_for(carol)}") as second:
+            _drain_ready(second)
+            with live.websocket_connect(f"/ws?token={token_for(alice)}") as leaver:
+                _drain_ready(leaver)
+                leaver.send_json({"type": "call.hangup", "conversation_id": team.id})
+
+                for remaining in (first, second):
+                    frame = _await_event(remaining, "call.ended")
+                    assert frame["data"]["reason"] == "hangup"
+                    assert frame["data"]["from_user_id"] == alice.id
+
+
+def test_a_one_to_one_conversation_refuses_mesh_frames(live, alice, bob, token_for, pair):
+    """The per-pair frames exist because a mesh has more than one pair. In a
+    one-to-one call the negotiation rides on the invite and the accept, so an
+    offer arriving outside that would be answering nothing."""
     with live.websocket_connect(f"/ws?token={token_for(alice)}") as caller:
         _drain_ready(caller)
         caller.send_json({
-            "type": "call.invite",
-            "conversation_id": group.id,
+            "type": "call.offer",
+            "conversation_id": pair.id,
+            "target_user_id": bob.id,
             "call_type": "audio",
             "sdp": OFFER,
         })
-
         frame = _await_event(caller, "error")
         assert "one-to-one" in frame["data"]["detail"]
 
