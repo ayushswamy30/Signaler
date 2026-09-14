@@ -312,7 +312,11 @@ Deliberate, and listed so they are not mistaken for oversights:
 - **Phone verification and photo upload are placeholders**, shown in the UI and
   labelled as such.
 - **A free-tier deployment sleeps.** After 15 minutes without traffic the
-  instance stops; the next request takes roughly a minute to wake it, and open
+  instance stops; the next request takes roughly a minute to wake it. The app
+  says so rather than showing a loading screen that cannot be told apart from
+  a broken one — the startup session check retries for up to a minute behind a
+  "Waking the server…" message with a "Go to sign in" way out, and then falls
+  through to the sign-in page instead of waiting forever. Open
   WebSockets drop in the meantime. The client reconnects on its own, but live
   delivery pauses while the server is asleep.
 

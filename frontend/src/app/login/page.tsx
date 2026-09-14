@@ -6,6 +6,7 @@ import { AuthShell } from "../AuthShell";
 import { Button, Field } from "@/components/Primitives";
 import { Icon } from "@/components/Icon";
 import { ApiError } from "@/lib/api";
+import { useSlowRequest } from "@/lib/useSlowRequest";
 import { useAuth, useRedirectIfSignedIn } from "@/lib/auth";
 
 export default function LoginPage() {
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const slow = useSlowRequest(loading);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -65,6 +67,12 @@ export default function LoginPage() {
         <Field id="password" label="Password" type="password" autoComplete="current-password"
           value={password} onChange={(event) => setPassword(event.target.value)}
           placeholder="••••••••" />
+        {slow && !error && (
+          <p aria-live="polite" className="text-md text-ink-muted">
+            Still going. The free-tier server sleeps when idle, so the first
+            request after a quiet spell can take up to a minute to wake it.
+          </p>
+        )}
         <Button type="submit" loading={loading} className="w-full">Sign in</Button>
       </form>
     </AuthShell>

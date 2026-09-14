@@ -6,6 +6,7 @@ import { AuthShell } from "../AuthShell";
 import { Avatar, Button, Field } from "@/components/Primitives";
 import { Icon } from "@/components/Icon";
 import { ApiError } from "@/lib/api";
+import { useSlowRequest } from "@/lib/useSlowRequest";
 import { useAuth, useRedirectIfSignedIn } from "@/lib/auth";
 
 /** Mirrors the rules the API enforces, so the common mistakes are caught
@@ -24,6 +25,7 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const slow = useSlowRequest(loading);
 
   const set = (key: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
@@ -114,6 +116,12 @@ export default function RegisterPage() {
         <Field id="password" label="Password" type="password" value={form.password}
           onChange={set("password")} error={errors.password}
           helper={`At least ${MIN_PASSWORD} characters.`} autoComplete="new-password" />
+        {slow && !Object.keys(errors).length && (
+          <p aria-live="polite" className="text-md text-ink-muted">
+            Still going. The free-tier server sleeps when idle, so the first
+            request after a quiet spell can take up to a minute to wake it.
+          </p>
+        )}
         <Button type="submit" loading={loading} className="w-full">Create account</Button>
       </form>
     </AuthShell>

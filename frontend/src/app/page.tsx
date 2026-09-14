@@ -9,12 +9,13 @@ import { useMessenger } from "@/lib/useMessenger";
 import { counterpart, crossesDay, formatDateSeparator, subtitle, title } from "@/lib/format";
 import type { Message } from "@/lib/types";
 import { Icon } from "@/components/Icon";
-import { Avatar, Button, EmptyState, Skeleton } from "@/components/Primitives";
+import { Avatar, Button, EmptyState } from "@/components/Primitives";
 import { Sidebar } from "@/components/Sidebar";
 import { Composer } from "@/components/Composer";
 import { NewMessageModal } from "@/components/NewMessageModal";
 import { NewGroupModal } from "@/components/NewGroupModal";
 import { ConversationInfo } from "@/components/ConversationInfo";
+import { BootScreen } from "@/components/BootScreen";
 import { CallOverlay } from "@/components/CallOverlay";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CursorWave } from "@/components/CursorWave";
@@ -33,22 +34,6 @@ export default function AppPage() {
   // away, and an empty document in between reads as a broken page.
   if (!me) return <BootScreen />;
   return <Messenger />;
-}
-
-function BootScreen() {
-  const contentRef = useRef<HTMLDivElement>(null);
-  return (
-    <div className="flex h-dvh items-center justify-center bg-canvas">
-      <CursorWave avoidRef={contentRef} />
-      <div ref={contentRef} className="flex flex-col items-center gap-md" role="status"
-        aria-label="Loading Signaler">
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-white">
-          <Icon name="send" size={22} strokeWidth={1.9} />
-        </span>
-        <Skeleton className="h-[10px] w-[120px]" />
-      </div>
-    </div>
-  );
 }
 
 function Messenger() {
