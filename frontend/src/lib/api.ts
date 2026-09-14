@@ -83,19 +83,35 @@ export const tokens = {
  *  four refresh tokens, and rotation would invalidate three of them. */
 let refreshing: Promise<boolean> | null = null;
 
-async function refreshSession(): Promise<boolean> {
+/** `timeoutMs` is the deadline of whichever request hit the 401 and triggered
+ *  this, so a caller that asked to be answered within a few seconds is not
+ *  held for a minute by the refresh it did not know it was making. When
+ *  several requests queue behind one exchange, the first one's deadline is the
+ *  one that applies -- they are all waiting on the same fetch. */
+async function refreshSession(timeoutMs: number): Promise<boolean> {
   const refresh_token = tokens.refresh;
   if (!refresh_token) return false;
 
   refreshing ??= (async () => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token }),
-      });
+      const controller = new AbortController();
+      const expiry = setTimeout(() => controller.abort(), timeoutMs);
+      let response: Response;
+      try {
+        response = await fetch(`${API_URL}/api/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(expiry);
+      }
+      // Same distinction as the session check in auth.tsx: a 4xx means this
+      // refresh token is spent, a 5xx means the server is unwell. Clearing on
+      // both signed people out whenever the backend hiccuped.
       if (!response.ok) {
-        tokens.clear();
+        if (response.status < 500) tokens.clear();
         return false;
       }
       tokens.save((await response.json()) as TokenDTO);
@@ -117,10 +133,37 @@ interface RequestOptions {
   auth?: boolean;
   /** Internal: stops a refreshed request from refreshing again in a loop. */
   retried?: boolean;
+  /** How long to wait before giving up, in milliseconds.
+   *
+   *  `fetch` has no timeout of its own: a connection that is accepted and then
+   *  never answered -- which is exactly what a sleeping free-tier instance
+   *  looks like -- leaves the promise pending for minutes, or until the
+   *  browser decides otherwise. Anything awaiting it waits with it, which is
+   *  how a screen ends up stuck with nothing to show and nothing to retry.
+   *
+   *  The default is generous on purpose: a cold Render instance can take the
+   *  better part of a minute to answer its first request, and a timeout that
+   *  fired sooner would make signing in impossible rather than merely slow.
+   *  Callers that must not block a whole screen pass something shorter and
+   *  handle the timeout themselves -- see the session check in auth.tsx. */
+  timeoutMs?: number;
 }
 
+/** The ceiling on any single request. Long enough to cover a cold start,
+ *  short enough that "the server is not answering" is eventually a fact the
+ *  UI can state rather than a wait with no end. */
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+// A request that ran out of time, or never reached the server at all, is
+// reported as status 0 -- there is no HTTP status, because there was no
+// response. Callers use that to tell "the server said no" from "the server
+// said nothing", which need very different handling.
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, auth = true, retried = false } = options;
+  const {
+    method = "GET", body, auth = true, retried = false,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  } = options;
 
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
@@ -129,20 +172,36 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (access) headers.Authorization = `Bearer ${access}`;
   }
 
+  // AbortController rather than AbortSignal.timeout, which older Safari does
+  // not have -- and a browser that quietly ignored the timeout would be back
+  // to hanging forever, which is the bug this exists to prevent.
+  const controller = new AbortController();
+  const expiry = setTimeout(() => controller.abort(), timeoutMs);
+
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
     });
-  } catch {
-    // fetch only rejects when the request never completed: the server is down,
-    // DNS failed, or the device is offline. There is no status to report.
-    throw new ApiError(0, "Cannot reach the server. Check your connection.");
+  } catch (problem) {
+    // fetch only rejects when the request never completed: it timed out, the
+    // server is down, DNS failed, or the device is offline. There is no status
+    // to report in any of those cases.
+    const timedOut = problem instanceof Error && problem.name === "AbortError";
+    throw new ApiError(
+      0,
+      timedOut
+        ? "The server is taking too long to respond. It may be starting up — try again in a moment."
+        : "Cannot reach the server. Check your connection.",
+    );
+  } finally {
+    clearTimeout(expiry);
   }
 
-  if (response.status === 401 && auth && !retried && (await refreshSession())) {
+  if (response.status === 401 && auth && !retried && (await refreshSession(timeoutMs))) {
     return request<T>(path, { ...options, retried: true });
   }
 
@@ -197,7 +256,9 @@ export const api = {
       auth: false,
     }),
 
-  me: () => request<MeDTO>("/api/users/me"),
+  /** `timeoutMs` is passed through so the session check at startup can give up
+   *  quickly and retry, instead of holding the whole app on a loading screen. */
+  me: (timeoutMs?: number) => request<MeDTO>("/api/users/me", { timeoutMs }),
 
   updateProfile: (body: { display_name?: string; about?: string; avatar_url?: string }) =>
     request<MeDTO>("/api/users/me", { method: "PATCH", body }),

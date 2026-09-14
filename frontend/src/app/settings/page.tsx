@@ -7,6 +7,7 @@ import { clsx } from "@/lib/clsx";
 import { api, ApiError } from "@/lib/api";
 import { toMe } from "@/lib/adapt";
 import { useAuth, useRequireAuth } from "@/lib/auth";
+import { BootScreen } from "@/components/BootScreen";
 import type { Me } from "@/lib/types";
 import { Icon, type IconName } from "@/components/Icon";
 import { Avatar, Button, Chip, Field } from "@/components/Primitives";
@@ -26,7 +27,9 @@ export default function SettingsPage() {
   const me = useRequireAuth();
   const [section, setSection] = useState("profile");
 
-  if (!me) return null;
+  // A blank page, previously, which on a cold backend meant staring at
+  // nothing for as long as the session check took.
+  if (!me) return <BootScreen />;
 
   return (
     <div className="flex h-dvh overflow-hidden bg-canvas">

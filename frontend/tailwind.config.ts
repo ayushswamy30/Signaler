@@ -28,6 +28,16 @@ export default {
         "2xl": ["24px", "32px"], "3xl": ["32px", "40px"],
       },
       fontFamily: { sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"] },
+      keyframes: {
+        // A bar that travels, so "still working" is visible at a glance. The
+        // sweep runs edge to edge rather than pulsing in place: a pulse in a
+        // near-background colour is what made the old boot screen look dead.
+        "boot-sweep": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(300%)" },
+        },
+      },
+      animation: { "boot-sweep": "boot-sweep 1.2s ease-in-out infinite" },
       boxShadow: {
         xs: "0 1px 2px rgba(0,0,0,.06)", sm: "0 2px 6px rgba(0,0,0,.08)",
         md: "0 4px 12px rgba(0,0,0,.10)", lg: "0 8px 24px rgba(0,0,0,.14)",
