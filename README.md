@@ -160,6 +160,13 @@ The server holds no call state at all: "who is in this call" is something the
 members tell each other, which is why an accept is fanned out to the whole
 conversation rather than to the caller alone.
 
+The camera is asked for in the shape of the device holding it — a wide frame
+from a laptop, a tall one from a phone — rather than a fixed 1280×720 for
+everyone, and both the full-screen video and the small self-view are drawn at
+whatever shape actually arrived. A call between a laptop and a phone therefore
+shows each end as it was filmed, letterboxed where the shapes differ, instead
+of cropping into the middle of someone's face to fill the screen.
+
 The microphone and camera are requested through `getUserMedia`, which is what
 raises the browser's permission prompt. It runs before any negotiation, because
 there is no point connecting a call someone cannot speak into, and each way it

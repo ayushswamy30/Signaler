@@ -31,6 +31,41 @@ function useStream(stream: MediaStream | null) {
   return ref;
 }
 
+/** The real shape of a stream's video, read from the element playing it.
+ *
+ *  A call has no say in what shape the other end sends: in one call a phone
+ *  held upright sends a tall frame while a laptop webcam sends a wide one, and
+ *  both are correct. The only honest source for it is the track itself, which
+ *  is why this reads the element rather than assuming.
+ *
+ *  Not known until metadata arrives, and not fixed afterwards either -- a
+ *  phone turned on its side mid-call fires `resize` with new dimensions -- so
+ *  both events are listened for. */
+function useFrameAspect(ref: RefObject<HTMLMediaElement | null>, stream: MediaStream | null) {
+  const [aspect, setAspect] = useState<number | null>(null);
+
+  useEffect(() => {
+    const element = ref.current as HTMLVideoElement | null;
+    if (!element) {
+      setAspect(null);
+      return;
+    }
+    const read = () => {
+      const { videoWidth: width, videoHeight: height } = element;
+      setAspect(width > 0 && height > 0 ? width / height : null);
+    };
+    read();
+    element.addEventListener("loadedmetadata", read);
+    element.addEventListener("resize", read);
+    return () => {
+      element.removeEventListener("loadedmetadata", read);
+      element.removeEventListener("resize", read);
+    };
+  }, [ref, stream]);
+
+  return aspect;
+}
+
 /** "05:31" — how long the call has been connected. */
 function useElapsed(startedAt: number | null) {
   const [now, setNow] = useState(() => Date.now());
@@ -54,6 +89,7 @@ export function CallOverlay({ controller }: { controller: CallController }) {
   // the tile that renders it.
   const remoteStream = call.isGroup ? null : call.participants[0]?.stream ?? null;
   const remoteVideo = useStream(remoteStream);
+  const localAspect = useFrameAspect(localVideo, call.localStream);
   const elapsed = useElapsed(call.startedAt);
   const [devicePickerOpen, setDevicePickerOpen] = useState(false);
   const devicePickerBox = useRef<HTMLDivElement>(null);
@@ -142,7 +178,11 @@ export function CallOverlay({ controller }: { controller: CallController }) {
             ref={remoteVideo as RefObject<HTMLVideoElement>}
             autoPlay
             playsInline
-            className="h-full w-full object-cover"
+            // `contain`, not `cover`. Cropping to fill meant a tall frame from
+            // a phone arrived on a wide laptop screen zoomed into the middle of
+            // someone's face, and a wide frame from a laptop lost its edges on
+            // a phone. Letterboxing shows what was actually sent.
+            className="h-full w-full object-contain"
           />
         ) : (
           <div className="flex flex-col items-center gap-lg">
@@ -171,9 +211,18 @@ export function CallOverlay({ controller }: { controller: CallController }) {
             autoPlay
             playsInline
             muted
+            // The box takes the camera's own shape rather than a fixed 3:4
+            // portrait, which is what made a 16:9 laptop webcam show up as a
+            // cropped portrait sliver of its owner. Whichever side is longer
+            // is the one that gets pinned, so a tall phone frame does not grow
+            // into a column down the screen.
+            style={{ aspectRatio: String(localAspect ?? 4 / 3) }}
             className={clsx(
-              "absolute bottom-lg right-lg h-[150px] w-[112px] scale-x-[-1] rounded-lg",
-              "border border-white/15 object-cover shadow-lg md:h-[200px] md:w-[150px]",
+              "absolute bottom-lg right-lg scale-x-[-1] rounded-lg border border-white/15",
+              "object-cover shadow-lg",
+              (localAspect ?? 4 / 3) >= 1
+                ? "w-[150px] md:w-[210px]"
+                : "h-[150px] md:h-[210px]",
               !call.cameraOn && "hidden",
             )}
           />
@@ -295,7 +344,7 @@ function PeerTile({ person, isVideo }: { person: CallParticipant; isVideo: boole
       rounded-lg bg-white/5">
       {showVideo ? (
         <video ref={media as RefObject<HTMLVideoElement>} autoPlay playsInline
-          className="h-full w-full object-cover" />
+          className="h-full w-full object-contain" />
       ) : (
         <>
           <audio ref={media as RefObject<HTMLAudioElement>} autoPlay hidden />

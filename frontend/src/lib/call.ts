@@ -229,13 +229,34 @@ function buildAudioConstraint(deviceId: string): MediaTrackConstraints | boolean
   return deviceId ? { deviceId: { exact: deviceId } } : true;
 }
 
+/** Capture in the shape of the device doing the capturing.
+ *
+ *  This used to ask every device for 1280x720. A laptop webcam is that shape
+ *  already; a phone held upright is not, so the browser either handed back a
+ *  sideways frame or cropped a tall sensor into a wide one. That is how a call
+ *  ended up the wrong way round in both directions at once -- the phone
+ *  sending a landscape frame, and the laptop's own picture squeezed into a
+ *  portrait box.
+ *
+ *  Asking for an aspect ratio that matches the viewport lets each device send
+ *  what it actually sees. `ideal` rather than `exact` throughout: a camera
+ *  that cannot do the requested shape should give its closest match, not
+ *  refuse the call outright.
+ */
 function buildVideoConstraint(deviceId: string): MediaTrackConstraints {
+  const portrait =
+    typeof window !== "undefined" && window.innerHeight > window.innerWidth;
+  const long = 1280;
+  const short = 720;
+
   return {
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
+    width: { ideal: portrait ? short : long },
+    height: { ideal: portrait ? long : short },
+    aspectRatio: { ideal: portrait ? short / long : long / short },
     ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
   };
 }
+
 interface CallDevices {
   mics: MediaDeviceInfo[];
   cameras: MediaDeviceInfo[];
