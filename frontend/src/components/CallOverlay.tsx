@@ -178,11 +178,14 @@ export function CallOverlay({ controller }: { controller: CallController }) {
             ref={remoteVideo as RefObject<HTMLVideoElement>}
             autoPlay
             playsInline
-            // `contain`, not `cover`. Cropping to fill meant a tall frame from
-            // a phone arrived on a wide laptop screen zoomed into the middle of
-            // someone's face, and a wide frame from a laptop lost its edges on
-            // a phone. Letterboxing shows what was actually sent.
-            className="h-full w-full object-contain"
+            // `cover`: the picture fills the screen it is on, so a phone shows
+            // a call the shape of a phone and a laptop the shape of a laptop.
+            // `contain` was tried here and was worse in practice -- a portrait
+            // frame on a laptop became a narrow strip floating in black, and a
+            // laptop's frame on a phone a thin band across the middle. The
+            // cropping that `cover` does is now small, because each end films
+            // in its own shape rather than everyone filming 16:9.
+            className="h-full w-full object-cover"
           />
         ) : (
           <div className="flex flex-col items-center gap-lg">
@@ -204,13 +207,16 @@ export function CallOverlay({ controller }: { controller: CallController }) {
 
         {/* Your own camera, small and mirrored — mirrored because people expect
             to see themselves as they do in a mirror, not as others see them.
-            Muted, or you would hear yourself echo. */}
+            Muted, or you would hear yourself echo.
+
+            The box stays on screen for the whole call and turning the camera
+            off puts a label in it rather than removing it. It used to be
+            hidden outright, which left no way to tell "my camera is off" from
+            "the self-view is broken" — and any state that got `cameraOn`
+            wrong, such as a camera that failed to reopen after a device
+            change, showed up as the preview simply never appearing. */}
         {isVideo && call.localStream && (
-          <video
-            ref={localVideo as RefObject<HTMLVideoElement>}
-            autoPlay
-            playsInline
-            muted
+          <div
             // The box takes the camera's own shape rather than a fixed 3:4
             // portrait, which is what made a 16:9 laptop webcam show up as a
             // cropped portrait sliver of its owner. Whichever side is longer
@@ -218,14 +224,33 @@ export function CallOverlay({ controller }: { controller: CallController }) {
             // into a column down the screen.
             style={{ aspectRatio: String(localAspect ?? 4 / 3) }}
             className={clsx(
-              "absolute bottom-lg right-lg scale-x-[-1] rounded-lg border border-white/15",
-              "object-cover shadow-lg",
+              // Above the full-screen video explicitly, rather than relying on
+              // being later in the document.
+              "absolute bottom-lg right-lg z-10 overflow-hidden rounded-lg",
+              "border border-white/15 bg-[#141A21] shadow-lg",
               (localAspect ?? 4 / 3) >= 1
-                ? "w-[150px] md:w-[210px]"
-                : "h-[150px] md:h-[210px]",
-              !call.cameraOn && "hidden",
+                ? "w-[168px] md:w-[240px]"
+                : "h-[168px] md:h-[240px]",
             )}
-          />
+          >
+            <video
+              ref={localVideo as RefObject<HTMLVideoElement>}
+              autoPlay
+              playsInline
+              muted
+              className={clsx(
+                "h-full w-full scale-x-[-1] object-cover",
+                !call.cameraOn && "invisible",
+              )}
+            />
+            {!call.cameraOn && (
+              <span className="absolute inset-0 flex flex-col items-center justify-center gap-xs
+                text-white/70">
+                <Icon name="video" size={20} strokeWidth={1.8} />
+                <span className="text-sm">Camera off</span>
+              </span>
+            )}
+          </div>
         )}
 
         {/* When video is running, the name moves to a banner so it does not
@@ -344,7 +369,7 @@ function PeerTile({ person, isVideo }: { person: CallParticipant; isVideo: boole
       rounded-lg bg-white/5">
       {showVideo ? (
         <video ref={media as RefObject<HTMLVideoElement>} autoPlay playsInline
-          className="h-full w-full object-contain" />
+          className="h-full w-full object-cover" />
       ) : (
         <>
           <audio ref={media as RefObject<HTMLAudioElement>} autoPlay hidden />
