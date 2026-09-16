@@ -26,18 +26,24 @@ const SECTIONS: Array<{ id: string; label: string; icon: IconName; placeholder?:
 export default function SettingsPage() {
   const me = useRequireAuth();
   const [section, setSection] = useState("profile");
+  // Which of the two panes a narrow screen is showing. On desktop both are
+  // visible at once and this is ignored; on a phone there is only room for
+  // one, so choosing a section swaps the list out for it -- the same
+  // list-then-detail pattern the conversation list uses.
+  const [pane, setPane] = useState<"list" | "detail">("list");
 
   // A blank page, previously, which on a cold backend meant staring at
   // nothing for as long as the session check took.
   if (!me) return <BootScreen />;
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-canvas">
+    <div id="main" className="flex h-dvh overflow-hidden bg-canvas">
       <nav
         aria-label="Settings sections"
         className={clsx(
           "flex w-full shrink-0 flex-col gap-[2px] overflow-y-auto border-r border-line",
-          "bg-surface p-md md:w-[300px]",
+          "bg-surface p-md md:w-[300px] md:flex",
+          pane === "detail" && "hidden",
         )}
       >
         <Link href="/" className="mb-sm flex items-center gap-sm rounded-md p-[10px_12px]
@@ -48,7 +54,10 @@ export default function SettingsPage() {
         {SECTIONS.map((entry) => (
           <button
             key={entry.id}
-            onClick={() => setSection(entry.id)}
+            onClick={() => {
+              setSection(entry.id);
+              setPane("detail");
+            }}
             aria-current={section === entry.id}
             className={clsx(
               "flex items-center gap-[11px] rounded-lg p-[10px_12px] text-left",
@@ -71,14 +80,33 @@ export default function SettingsPage() {
         </p>
       </nav>
 
-      <main id="main" className="hidden min-w-0 flex-1 flex-col overflow-y-auto md:flex">
-        <header className="flex items-center gap-md border-b border-line bg-surface px-2xl py-lg">
+      {/* This pane used to be `hidden ... md:flex`, with nothing to reveal it:
+          on a phone the sections listed beside it could be tapped, and the
+          panel they selected was display:none at every width below md. The
+          settings screen was navigable and permanently empty. */}
+      <main
+        className={clsx(
+          "min-w-0 flex-1 flex-col overflow-y-auto md:flex",
+          pane === "detail" ? "flex" : "hidden",
+        )}
+      >
+        <header className="flex items-center gap-md border-b border-line bg-surface
+          px-lg py-md md:px-2xl md:py-lg">
+          {/* The way back to the list, on the screens where the list had to be
+              given up to show this. */}
+          <button
+            onClick={() => setPane("list")}
+            aria-label="Back to settings sections"
+            className="-ml-xs rounded-md p-xs text-ink-muted hover:bg-hover hover:text-ink md:hidden"
+          >
+            <Icon name="back" size={20} />
+          </button>
           <h1 className="flex-1 text-xl font-semibold">
             {SECTIONS.find((entry) => entry.id === section)?.label}
           </h1>
         </header>
 
-        <div className="max-w-[620px] p-2xl">
+        <div className="max-w-[620px] p-lg md:p-2xl">
           {section === "profile" && <ProfileSection me={me} />}
           {section === "account" && <AccountSection me={me} />}
           {section === "appearance" && <AppearanceSection />}
