@@ -162,10 +162,17 @@ conversation rather than to the caller alone.
 
 The camera is asked for in the shape of the device holding it — a wide frame
 from a laptop, a tall one from a phone — rather than a fixed 1280×720 for
-everyone, and both the full-screen video and the small self-view are drawn at
-whatever shape actually arrived. A call between a laptop and a phone therefore
-shows each end as it was filmed, letterboxed where the shapes differ, instead
-of cropping into the middle of someone's face to fill the screen.
+everyone. The picture then fills the screen it is shown on, so a call looks
+like a phone call on a phone and a desktop call on a laptop. Letterboxing was
+tried instead and was worse: a portrait frame on a laptop became a narrow
+strip floating in black. Filming in the right shape is what makes filling the
+screen cheap, because there is little left to crop between two devices of the
+same orientation.
+
+The small self-view takes its shape from the camera rather than a fixed box,
+and stays on screen for the whole call — turning the camera off labels it
+"Camera off" rather than removing it, so there is no state where the preview
+simply is not there.
 
 The microphone and camera are requested through `getUserMedia`, which is what
 raises the browser's permission prompt. It runs before any negotiation, because
