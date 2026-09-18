@@ -12,6 +12,9 @@ venv/
 *.db
 *.sqlite3
 
+# Uploaded message attachments (see backend/app/api/uploads.py)
+backend/uploads/
+
 # OS
 .DS_Store
 

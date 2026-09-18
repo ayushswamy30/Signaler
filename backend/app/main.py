@@ -4,12 +4,15 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.errors import register_error_handlers
 from app.api.router import api_router
+from app.api.uploads import UPLOAD_DIR
 from app.core.config import settings
 from app.schemas.common import ErrorResponse
 from app.websocket import events
@@ -77,3 +80,9 @@ app.include_router(api_router)
 # Mounted at the root, not under /api: it is not an HTTP resource, and keeping
 # it out of the API prefix keeps the OpenAPI document to HTTP endpoints only.
 app.include_router(websocket_router)
+
+# Serves whatever /api/uploads has written. Created eagerly because
+# StaticFiles checks the directory exists at mount time, before any upload
+# has had a chance to create it.
+Path(UPLOAD_DIR).mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")

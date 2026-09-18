@@ -17,6 +17,7 @@ import type {
   MessagePageDTO,
   ParticipantDTO,
   TokenDTO,
+  UploadDTO,
   UserDTO,
 } from "./dto";
 
@@ -334,4 +335,24 @@ export const api = {
     request<{ detail: string }>(`/api/groups/${id}/leave`, { method: "POST" }),
 
   iceServers: () => request<IceServersDTO>("/api/calls/ice-servers"),
+
+  /** Bypasses `request`: that helper always JSON-encodes the body, but a
+   *  file has to go up as multipart/form-data, with the boundary header the
+   *  browser sets itself -- setting Content-Type by hand here would omit it
+   *  and the server would fail to parse the body at all. */
+  uploadFile: async (file: File): Promise<UploadDTO> => {
+    const form = new FormData();
+    form.append("file", file);
+    const headers: Record<string, string> = {};
+    const access = tokens.access;
+    if (access) headers.Authorization = `Bearer ${access}`;
+
+    const response = await fetch(`${API_URL}/api/uploads`, {
+      method: "POST",
+      headers,
+      body: form,
+    });
+    if (!response.ok) throw new ApiError(response.status, await errorMessage(response));
+    return (await response.json()) as UploadDTO;
+  },
 };

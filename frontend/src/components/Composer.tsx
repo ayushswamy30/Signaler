@@ -1,10 +1,18 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
 import { clsx } from "@/lib/clsx";
 import { Icon } from "./Icon";
 import { Spinner } from "./Primitives";
 import { EmojiPicker } from "./EmojiPicker";
 import { markSticker } from "@/lib/emoji";
+import { markAttachment } from "@/lib/attachment";
+import { API_URL, api, ApiError } from "@/lib/api";
+
+/** Kept loose on purpose: it only steers the OS file picker's default filter,
+ *  while app/api/uploads.py's allowlist is what actually decides what a
+ *  server accepts, so the two never have to be kept in lockstep. */
+const ACCEPT_ATTACHMENTS =
+  "image/*,audio/*,video/*,application/pdf,text/plain,.docx,.xlsx,.zip";
 
 /** How long after the last keystroke the "still typing" signal stops.
  *  Slightly under the receiver's own expiry, so the indicator is refreshed
@@ -25,8 +33,11 @@ export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCance
   const [value, setValue] = useState(initialValue);
   const [sending, setSending] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const canSend = value.trim().length > 0 && !disabled && !sending;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Spans the smile button and the popover, so a click on the button to
   // close it does not also read as "outside" and reopen it.
   const pickerBox = useRef<HTMLDivElement>(null);
@@ -118,15 +129,46 @@ export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCance
     onSend(markSticker(sticker));
   }
 
+  /** An attachment is, like a sticker, its own message -- it goes out the
+   *  moment the upload finishes rather than waiting on whatever is in the
+   *  text box. */
+  async function onFileChosen(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Cleared immediately, not after the upload: without this, picking the
+    // same file twice in a row fires no "change" event the second time.
+    e.target.value = "";
+    if (!file || disabled || uploading) return;
+
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const result = await api.uploadFile(file);
+      onSend(markAttachment({
+        url: `${API_URL}${result.url}`,
+        name: result.name,
+        contentType: result.content_type,
+        size: result.size,
+      }));
+    } catch (problem) {
+      setUploadError(problem instanceof ApiError ? problem.message : "Could not upload the file.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <form onSubmit={submit}
       className={clsx("border-t border-line bg-surface px-lg pb-lg pt-md md:px-xl", disabled && "opacity-60")}>
-      {error && (
+      {(error || uploadError) && (
         <div role="alert" className="mb-sm flex items-center gap-sm rounded-md px-md py-sm
           text-sm font-medium" style={{ background: "#FBE3E3", color: "#B32B2B" }}>
           <Icon name="warn" size={16} strokeWidth={1.8} />
-          <span className="flex-1">{error}</span>
-          {onRetry && <button type="button" onClick={onRetry} className="font-semibold underline">Retry</button>}
+          <span className="flex-1">{error ?? uploadError}</span>
+          {error && onRetry && <button type="button" onClick={onRetry} className="font-semibold underline">Retry</button>}
+          {!error && (
+            <button type="button" onClick={() => setUploadError(null)} aria-label="Dismiss"
+              className="text-inherit"><Icon name="close" size={14} /></button>
+          )}
         </div>
       )}
       {replyTo && (
@@ -149,8 +191,13 @@ export function Composer({ onSend, onTyping, initialValue = "", replyTo, onCance
             placeholder="Message"
             className="max-h-[120px] flex-1 resize-none bg-transparent text-base outline-none
               placeholder:text-ink-faint focus-visible:!outline-none" />
-          <button type="button" aria-label="Attach a file"
-            className="text-ink-faint hover:text-ink"><Icon name="clip" size={19} /></button>
+          <input ref={fileInputRef} type="file" hidden accept={ACCEPT_ATTACHMENTS}
+            onChange={(e) => void onFileChosen(e)} />
+          <button type="button" aria-label="Attach a file" disabled={disabled || uploading}
+            onClick={() => fileInputRef.current?.click()}
+            className="text-ink-faint hover:text-ink disabled:opacity-50">
+            {uploading ? <Spinner /> : <Icon name="clip" size={19} />}
+          </button>
           <div className="relative" ref={pickerBox}>
             <button type="button" aria-label="Insert emoji" aria-expanded={pickerOpen}
               onClick={() => setPickerOpen((open) => !open)}

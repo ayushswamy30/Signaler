@@ -100,3 +100,10 @@ export interface IceServerDTO {
 export interface IceServersDTO {
   ice_servers: IceServerDTO[];
 }
+
+export interface UploadDTO {
+  url: string;
+  name: string;
+  content_type: string;
+  size: number;
+}
