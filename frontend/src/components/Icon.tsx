@@ -30,6 +30,8 @@ const paths: Record<string, string> = {
   arrowDown: "M12 5v14M6 13l6 6 6-6",
   moon: "M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5",
   sun: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2M12 20v2M22 12h-2M4 12H2M18.4 5.6l-1.4 1.4M7 17l-1.4 1.4M18.4 18.4L17 17M7 7L5.6 5.6",
+  chevronDown: "M6 9l6 6 6-6",
+  trash: "M5 7h14M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M7 7l1 12.5A1.5 1.5 0 0 0 9.5 21h5a1.5 1.5 0 0 0 1.5-1.5L17 7M10 11v6M14 11v6",
 };
 
 export type IconName = keyof typeof paths;

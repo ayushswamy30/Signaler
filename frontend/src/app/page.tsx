@@ -7,6 +7,7 @@ import { useAuth, useRequireAuth } from "@/lib/auth";
 import { useCall, type CallKind } from "@/lib/call";
 import { useMessenger } from "@/lib/useMessenger";
 import { counterpart, crossesDay, formatDateSeparator, subtitle, title } from "@/lib/format";
+import { parseSticker } from "@/lib/emoji";
 import type { Message } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { Avatar, Button, EmptyState } from "@/components/Primitives";
@@ -166,14 +167,15 @@ function Messenger() {
                   <span className="truncate text-sm text-ink-muted">{subtitle(active, me.id)}</span>
                 </span>
               </button>
-              {active.type === "direct" && (
-                <div className="flex items-center pr-xs">
-                  <IconButton label="Start voice call" icon="phone"
-                    onClick={() => startCall("audio")} />
-                  <IconButton label="Start video call" icon="video"
-                    onClick={() => startCall("video")} />
-                </div>
-              )}
+              <div className="flex items-center pr-xs">
+                <IconButton label={active.type === "group" ? "Start group voice call" : "Start voice call"}
+                  icon="phone" onClick={() => startCall("audio")} />
+                <IconButton label={active.type === "group" ? "Start group video call" : "Start video call"}
+                  icon="video" onClick={() => startCall("video")} />
+                <IconButton label={active.type === "group" ? "Group info" : "Contact info"}
+                  icon="info" onClick={() => setShowInfo(true)} />
+                <ThemeToggle />
+              </div>
             </div>
 
             <div className="hidden md:block">
@@ -309,11 +311,13 @@ function Messenger() {
   );
 }
 
-/** One message, plus the actions that hover over it.
+/** One message, plus a WhatsApp-style options menu on it.
  *
- *  The buttons are positioned outside the bubble and revealed on hover, but
- *  they stay in the tab order and appear on focus — hiding with `opacity`
- *  rather than `display` is what keeps them reachable from the keyboard. */
+ *  A small chevron sits inside the bubble's own top corner (revealed on
+ *  hover, kept visible on focus or while its menu is open) and opens a menu
+ *  with Reply/Edit/Delete. It is positioned relative to the bubble itself
+ *  rather than the full-width row, so it always lands on the bubble no
+ *  matter how wide the chat pane is. */
 function MessageRow({
   message,
   mine,
@@ -336,61 +340,82 @@ function MessageRow({
   onDiscard: () => void;
 }) {
   const failed = message.status === "failed";
+  const sticker = !message.replyTo && parseSticker(message.content);
+  const accent = mine && !sticker;
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   return (
-    <div className="group relative">
+    <>
       <MessageBubble
         message={message}
         mine={mine}
         first={first}
         last={last}
         showSender={showSender}
+        actions={failed ? undefined : (
+          <div ref={box}
+            className={clsx("absolute right-1 top-1 opacity-0 transition-opacity",
+              "group-hover:opacity-100 focus-within:opacity-100", open && "opacity-100")}>
+            <button onClick={() => setOpen((v) => !v)} aria-label="Message options"
+              aria-haspopup="menu" aria-expanded={open}
+              className={clsx("flex h-6 w-6 items-center justify-center rounded-full transition-colors",
+                accent ? "text-white/80 hover:bg-white/20 hover:text-white"
+                  : "text-ink-faint hover:bg-hover hover:text-ink")}>
+              <Icon name="chevronDown" size={14} />
+            </button>
+            {open && (
+              <div role="menu"
+                className={clsx("absolute top-full z-10 mt-1 w-[160px] overflow-hidden rounded-lg",
+                  "border border-line bg-raised py-xs shadow-lg",
+                  mine ? "right-0" : "left-0")}>
+                <MenuItem label="Reply" icon="reply" onClick={() => { setOpen(false); onReply(); }} />
+                {mine && !message.pending && (
+                  <>
+                    <MenuItem label="Edit" icon="edit" onClick={() => { setOpen(false); onEdit(); }} />
+                    <MenuItem label="Delete" icon="trash" onClick={() => { setOpen(false); onDelete(); }} />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       />
-
-      {failed ? (
+      {failed && (
         <p className={clsx("mt-[2px] flex gap-sm text-sm text-ink-danger",
           mine ? "justify-end" : "justify-start")}>
           Not delivered.
           <button onClick={onDiscard} className="font-semibold underline">Discard</button>
         </p>
-      ) : (
-        <div
-          className={clsx(
-            "absolute top-1 flex gap-[2px] opacity-0 transition-opacity",
-            "group-hover:opacity-100 focus-within:opacity-100",
-            mine ? "left-[-64px]" : "right-[-64px]",
-          )}
-        >
-          <ActionButton label={`Reply to ${message.sender.displayName}`} icon="reply" onClick={onReply} />
-          {mine && !message.pending && (
-            <>
-              <ActionButton label="Edit message" icon="edit" onClick={onEdit} />
-              <ActionButton label="Delete message" icon="close" onClick={onDelete} />
-            </>
-          )}
-        </div>
       )}
-    </div>
+    </>
   );
 }
 
-function ActionButton({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: "reply" | "edit" | "close";
-  onClick: () => void;
+function MenuItem({ label, icon, onClick }: {
+  label: string; icon: "reply" | "edit" | "trash"; onClick: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="rounded-md p-1 text-ink-faint hover:bg-hover hover:text-ink"
-    >
-      <Icon name={icon} size={15} />
+    <button role="menuitem" onClick={onClick}
+      className="flex w-full items-center gap-sm px-md py-[7px] text-left text-sm text-ink hover:bg-hover">
+      <Icon name={icon} size={16} className="text-ink-faint" />
+      {label}
     </button>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { clsx } from "@/lib/clsx";
 import { Icon } from "./Icon";
 import { Avatar, Badge } from "./Primitives";
@@ -53,8 +54,9 @@ export function ConversationItem({ conversation, meId, active, onSelect }: {
   );
 }
 
-export function MessageBubble({ message, mine, showSender, first, last }: {
+export function MessageBubble({ message, mine, showSender, first, last, actions }: {
   message: Message; mine: boolean; showSender: boolean; first: boolean; last: boolean;
+  actions?: ReactNode;
 }) {
   const near = "4px", far = "14px";
   const radius = mine
@@ -67,10 +69,11 @@ export function MessageBubble({ message, mine, showSender, first, last }: {
 
   return (
     <div className={clsx("flex", mine ? "justify-end" : "justify-start")}>
-      <div className={clsx("max-w-[min(460px,78%)]",
+      <div className={clsx("group relative max-w-[min(460px,78%)]",
           sticker ? "bg-transparent" : clsx("px-md py-sm",
             mine ? "bg-bubble-out text-bubble-outText" : "bg-bubble-in text-bubble-inText"))}
         style={sticker ? undefined : { borderRadius: radius }}>
+        {actions}
         {showSender && !mine && (
           <p className="mb-[2px] text-sm font-semibold text-accent">{message.sender.displayName}</p>
         )}
