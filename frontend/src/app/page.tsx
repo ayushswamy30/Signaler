@@ -8,6 +8,7 @@ import { useCall, type CallKind } from "@/lib/call";
 import { useMessenger } from "@/lib/useMessenger";
 import { counterpart, crossesDay, formatDateSeparator, subtitle, title } from "@/lib/format";
 import { parseSticker } from "@/lib/emoji";
+import { contentPreview, isImage, parseAttachment } from "@/lib/attachment";
 import type { Message } from "@/lib/types";
 import { Icon } from "@/components/Icon";
 import { Avatar, Button, EmptyState } from "@/components/Primitives";
@@ -260,7 +261,7 @@ function Messenger() {
                 editing
                   ? { sender: "Editing your message", content: editing.content }
                   : replyTo
-                    ? { sender: replyTo.sender.displayName, content: replyTo.content }
+                    ? { sender: replyTo.sender.displayName, content: contentPreview(replyTo.content) }
                     : null
               }
               onCancelReply={() => { setReplyTo(null); setEditing(null); }}
@@ -341,7 +342,9 @@ function MessageRow({
 }) {
   const failed = message.status === "failed";
   const sticker = !message.replyTo && parseSticker(message.content);
-  const accent = mine && !sticker;
+  const attachment = !message.replyTo && parseAttachment(message.content);
+  const chromeless = Boolean(sticker) || Boolean(attachment && isImage(attachment.contentType));
+  const accent = mine && !chromeless;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
@@ -388,7 +391,11 @@ function MessageRow({
                 <MenuItem label="Reply" icon="reply" onClick={() => { setOpen(false); onReply(); }} />
                 {mine && !message.pending && (
                   <>
-                    <MenuItem label="Edit" icon="edit" onClick={() => { setOpen(false); onEdit(); }} />
+                    {/* An attachment has no text to edit -- offering it would let
+                        editing overwrite the attachment with typed content. */}
+                    {!attachment && (
+                      <MenuItem label="Edit" icon="edit" onClick={() => { setOpen(false); onEdit(); }} />
+                    )}
                     <MenuItem label="Delete" icon="trash" onClick={() => { setOpen(false); onDelete(); }} />
                   </>
                 )}

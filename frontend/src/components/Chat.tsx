@@ -6,6 +6,7 @@ import { Avatar, Badge } from "./Primitives";
 import type { Conversation, DeliveryStatus, Message } from "@/lib/types";
 import { formatListTime, formatTime, preview, subtitle, title } from "@/lib/format";
 import { parseSticker } from "@/lib/emoji";
+import { contentPreview, formatBytes, isImage, parseAttachment } from "@/lib/attachment";
 
 /** Status uses a distinct glyph per state — never colour alone (brief §6, §19). */
 export function MessageStatusIcon({ status, onAccent }: {
@@ -64,15 +65,20 @@ export function MessageBubble({ message, mine, showSender, first, last, actions 
     : `${first ? far : near} ${far} ${far} ${last ? far : near}`;
 
   // A reply carries context that matters more than the enlargement, so only
-  // a plain message gets the sticker treatment.
+  // a plain message gets the sticker (or image-attachment) treatment.
   const sticker = message.replyTo ? null : parseSticker(message.content);
+  const attachment = message.replyTo ? null : parseAttachment(message.content);
+  const imageAttachment = attachment && isImage(attachment.contentType) ? attachment : null;
+  // Both a sticker and a photo read as "the message itself, not text in a
+  // box" -- so both drop the bubble's own background and padding the same way.
+  const chromeless = Boolean(sticker) || Boolean(imageAttachment);
 
   return (
     <div className={clsx("flex", mine ? "justify-end" : "justify-start")}>
       <div className={clsx("group relative max-w-[min(460px,78%)]",
-          sticker ? "bg-transparent" : clsx("px-md py-sm",
+          chromeless ? "bg-transparent" : clsx("px-md py-sm",
             mine ? "bg-bubble-out text-bubble-outText" : "bg-bubble-in text-bubble-inText"))}
-        style={sticker ? undefined : { borderRadius: radius }}>
+        style={chromeless ? undefined : { borderRadius: radius }}>
         {actions}
         {showSender && !mine && (
           <p className="mb-[2px] text-sm font-semibold text-accent">{message.sender.displayName}</p>
@@ -83,20 +89,39 @@ export function MessageBubble({ message, mine, showSender, first, last, actions 
             <p className={clsx("text-sm font-semibold", mine ? "text-white/95" : "text-accent")}>
               {message.replyTo.sender}</p>
             <p className={clsx("truncate text-sm", mine ? "text-white/80" : "text-ink-muted")}>
-              {message.replyTo.content}</p>
+              {contentPreview(message.replyTo.content)}</p>
           </div>
         )}
         {sticker ? (
           <p className="text-[56px] leading-none">{sticker}</p>
+        ) : imageAttachment ? (
+          <a href={imageAttachment.url} target="_blank" rel="noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a
+                same-origin-config-free backend upload, not an optimizable asset */}
+            <img src={imageAttachment.url} alt={imageAttachment.name}
+              className="max-h-[320px] max-w-full rounded-[14px] object-cover" />
+          </a>
+        ) : attachment ? (
+          <a href={attachment.url} target="_blank" rel="noreferrer" download={attachment.name}
+            className={clsx("flex items-center gap-sm rounded-md px-md py-sm transition-colors",
+              mine ? "bg-white/15 hover:bg-white/25" : "bg-hover hover:bg-active")}>
+            <Icon name="clip" size={20} className="shrink-0" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-sm font-medium">{attachment.name}</span>
+              <span className={clsx("text-xs", mine ? "text-white/70" : "text-ink-faint")}>
+                {formatBytes(attachment.size)}</span>
+            </span>
+            <Icon name="arrowDown" size={16} className="shrink-0" />
+          </a>
         ) : (
           <p className="whitespace-pre-wrap text-base">{message.content}</p>
         )}
         <p className={clsx("mt-[2px] flex items-center justify-end gap-[5px] text-xs",
-          sticker ? "text-ink-faint" : mine ? "text-white/75" : "text-ink-faint")}>
+          chromeless ? "text-ink-faint" : mine ? "text-white/75" : "text-ink-faint")}>
           {message.editedAt && <span>edited</span>}
           <span>{formatTime(message.createdAt)}</span>
           {mine && message.status && (
-            <MessageStatusIcon status={message.status} onAccent={!sticker} />
+            <MessageStatusIcon status={message.status} onAccent={!chromeless} />
           )}
         </p>
       </div>

@@ -2,6 +2,7 @@
  *  the short labels a messenger shows. */
 
 import type { Conversation, Message, User } from "./types";
+import { contentPreview } from "./attachment";
 
 /** The other person in a direct conversation.
  *
@@ -25,9 +26,10 @@ export function title(conversation: Conversation, meId: number): string {
 export function preview(conversation: Conversation, meId: number): string {
   const message = conversation.lastMessage;
   if (!message) return "No messages yet";
-  if (conversation.type !== "group") return message.content;
+  const text = contentPreview(message.content);
+  if (conversation.type !== "group") return text;
   const who = message.sender.id === meId ? "You" : message.sender.displayName.split(" ")[0];
-  return `${who}: ${message.content}`;
+  return `${who}: ${text}`;
 }
 
 const DAY = 24 * 60 * 60 * 1000;
