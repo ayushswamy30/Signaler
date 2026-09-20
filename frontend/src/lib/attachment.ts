@@ -30,6 +30,19 @@ export function parseAttachment(content: string): Attachment | null {
   return null;
 }
 
+/** Mirrors MAX_UPLOAD_BYTES in backend/app/api/uploads.py, which stays the
+ *  real limit -- it is checked here too only so an oversize file is refused
+ *  in the preview rather than after the whole thing has been uploaded. */
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
+/** Why this file can't be sent, or null when it can. The messages match the
+ *  server's own, so the person reads the same thing either way. */
+export function attachmentProblem(file: File): string | null {
+  if (file.size === 0) return "The file is empty.";
+  if (file.size > MAX_ATTACHMENT_BYTES) return "Files must be 20 MB or smaller.";
+  return null;
+}
+
 export function isImage(contentType: string): boolean {
   return contentType.startsWith("image/");
 }
@@ -39,8 +52,20 @@ export function isImage(contentType: string): boolean {
  *  never surfaces there as its own raw marker-and-JSON `content`. */
 export function contentPreview(content: string): string {
   const attachment = parseAttachment(content);
-  if (!attachment) return content;
-  return isImage(attachment.contentType) ? "📷 Photo" : `📎 ${attachment.name}`;
+  if (attachment) return isImage(attachment.contentType) ? "📷 Photo" : `📎 ${attachment.name}`;
+  // A reply's quoted content reaches the client already cut to 140 characters
+  // (REPLY_PREVIEW_LENGTH in backend/app/schemas/message.py), which is shorter
+  // than most attachment payloads -- so it arrives as broken JSON that
+  // parseAttachment rightly rejects. Recover what survives rather than print it.
+  if (content.startsWith(ATTACHMENT_MARK)) {
+    if (/"contentType":"image\//.test(content)) return "📷 Photo";
+    const name = /"name":"((?:[^"\\]|\\.)*)"/.exec(content)?.[1];
+    if (name) {
+      try { return `📎 ${JSON.parse(`"${name}"`)}`; } catch { return `📎 ${name}`; }
+    }
+    return "📎 Attachment";
+  }
+  return content;
 }
 
 export function formatBytes(bytes: number): string {
