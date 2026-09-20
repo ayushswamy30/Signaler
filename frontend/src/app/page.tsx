@@ -342,8 +342,11 @@ function MessageRow({
 }) {
   const failed = message.status === "failed";
   const sticker = !message.replyTo && parseSticker(message.content);
-  const attachment = !message.replyTo && parseAttachment(message.content);
-  const chromeless = Boolean(sticker) || Boolean(attachment && isImage(attachment.contentType));
+  // Parsed even for a reply (unlike a sticker): a reply can carry an
+  // attachment too, and it must not be offered Edit any more than any other.
+  const attachment = parseAttachment(message.content);
+  const chromeless = Boolean(sticker)
+    || Boolean(attachment && isImage(attachment.contentType) && !message.replyTo);
   const accent = mine && !chromeless;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);

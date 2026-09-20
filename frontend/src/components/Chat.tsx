@@ -65,13 +65,15 @@ export function MessageBubble({ message, mine, showSender, first, last, actions 
     : `${first ? far : near} ${far} ${far} ${last ? far : near}`;
 
   // A reply carries context that matters more than the enlargement, so only
-  // a plain message gets the sticker (or image-attachment) treatment.
+  // a plain message gets the sticker treatment. An attachment is always
+  // parsed, though: skipping it for a reply would print its raw JSON.
   const sticker = message.replyTo ? null : parseSticker(message.content);
-  const attachment = message.replyTo ? null : parseAttachment(message.content);
+  const attachment = parseAttachment(message.content);
   const imageAttachment = attachment && isImage(attachment.contentType) ? attachment : null;
-  // Both a sticker and a photo read as "the message itself, not text in a
-  // box" -- so both drop the bubble's own background and padding the same way.
-  const chromeless = Boolean(sticker) || Boolean(imageAttachment);
+  // A sticker and a standalone photo read as "the message itself, not text in
+  // a box" -- so both drop the bubble's own background and padding. A photo
+  // sent as a reply stays inside the bubble, under the quote it answers.
+  const chromeless = Boolean(sticker) || Boolean(imageAttachment && !message.replyTo);
 
   return (
     <div className={clsx("flex", mine ? "justify-end" : "justify-start")}>
