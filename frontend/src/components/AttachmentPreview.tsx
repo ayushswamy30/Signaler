@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { clsx } from "@/lib/clsx";
 import { attachmentProblem, formatBytes, isImage } from "@/lib/attachment";
 import { Icon } from "./Icon";
 import { Button } from "./Primitives";
@@ -22,6 +23,20 @@ function previewKind(file: File): PreviewKind {
   if (file.type === "text/plain") return "text";
   return "other";
 }
+
+/** A video's box is a fixed size for the screen, not sized by the video: it is
+ *  as large as the screen comfortably allows, with the picture letterboxed on
+ *  black inside it (the media-viewer look of Telegram and WhatsApp). Sizing it
+ *  by the video instead makes the dialog grow once the metadata loads, and
+ *  leaves a portrait clip -- most phone footage -- a thin strip in a wide box. */
+const VIDEO_BOX = "h-[min(50vh,480px)]";
+
+/** Held in a preview's place while its blob URL or text excerpt is being made
+ *  (one frame), at about the size it will be. Without it the dialog paints the
+ *  generic file card first and then jumps to the real preview. */
+const PENDING_HEIGHT: Partial<Record<PreviewKind, string>> = {
+  image: "h-[200px]", video: VIDEO_BOX, audio: "h-[104px]", pdf: "h-[45vh]", text: "h-[120px]",
+};
 
 /** Most phone browsers can't show a PDF inline, and an <object> for one leaves
  *  a tall empty box rather than falling back cleanly -- so ask up front.
@@ -47,18 +62,20 @@ export function AttachmentPreview({ file, uploading, error, onSend, onCancel }: 
   const [mediaFailed, setMediaFailed] = useState(false);
   const kind = file ? previewKind(file) : "other";
   const embedPdf = kind === "pdf" && canEmbedPdf();
+  const needsUrl = kind === "image" || kind === "video" || kind === "audio" || embedPdf;
   const problem = file ? attachmentProblem(file) : null;
   const blocked = problem !== null;
+  const pending = (needsUrl && objectUrl === null) || (kind === "text" && excerpt === null);
 
   // A blob URL holds the whole file in memory until it is revoked, so it is
   // created per file and released as soon as that file is no longer shown.
   useEffect(() => {
     setMediaFailed(false);
-    if (!file || !["image", "video", "audio", "pdf"].includes(kind)) { setObjectUrl(null); return; }
+    if (!file || !needsUrl) { setObjectUrl(null); return; }
     const url = URL.createObjectURL(file);
     setObjectUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [file, kind]);
+  }, [file, needsUrl]);
 
   useEffect(() => {
     if (!file || kind !== "text") { setExcerpt(null); return; }
@@ -90,7 +107,7 @@ export function AttachmentPreview({ file, uploading, error, onSend, onCancel }: 
       // Closing mid-upload would look like a cancel while the file still lands in the chat.
       onClose={() => { if (!uploading) onCancel(); }}
       title="Send attachment"
-      width={embedPdf ? 560 : 420}
+      width={embedPdf ? 560 : kind === "video" ? 720 : 420}
       footer={
         <>
           <Button variant="secondary" disabled={uploading} onClick={onCancel}>Cancel</Button>
@@ -100,16 +117,21 @@ export function AttachmentPreview({ file, uploading, error, onSend, onCancel }: 
     >
       {file && (
         <div className="flex flex-col gap-md pb-md">
-          {kind === "image" && objectUrl && !mediaFailed ? (
+          {pending ? (
+            <div className={clsx("w-full rounded-lg", kind === "video" ? "bg-black" : "bg-hover", PENDING_HEIGHT[kind])} />
+          ) : kind === "image" && objectUrl && !mediaFailed ? (
             <div className="flex max-h-[45vh] items-center justify-center overflow-hidden rounded-lg bg-hover">
               {/* eslint-disable-next-line @next/next/no-img-element -- a local blob URL, not an optimizable asset */}
               <img src={objectUrl} alt={`Preview of ${file.name}`} onError={() => setMediaFailed(true)}
                 className="max-h-[45vh] max-w-full object-contain" />
             </div>
           ) : kind === "video" && objectUrl && !mediaFailed ? (
-            <video src={objectUrl} controls preload="metadata" aria-label={`Preview of ${file.name}`}
+            // Square corners on purpose: rounding a <video> makes the browser
+            // clip it through a mask, which can drop it off the fast
+            // (hardware-overlay) path that keeps playback smooth.
+            <video src={objectUrl} controls playsInline preload="auto" aria-label={`Preview of ${file.name}`}
               onError={() => setMediaFailed(true)}
-              className="max-h-[45vh] w-full rounded-lg bg-black" />
+              className={clsx("w-full bg-black object-contain", VIDEO_BOX)} />
           ) : kind === "audio" && objectUrl && !mediaFailed ? (
             <div className="flex flex-col items-center gap-md rounded-lg bg-hover px-lg py-xl">
               <Icon name="clip" size={28} className="text-ink-muted" />
