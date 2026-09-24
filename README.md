@@ -3,8 +3,8 @@
 A working Signal Messenger clone: a FastAPI backend with real-time WebSocket
 delivery, and a Next.js client that talks to it. Registration, sign-in, direct
 and group conversations, replies, edits, deletions, typing indicators, presence,
-delivery receipts, read state, emoji and stickers, and voice and
-video calls all work end to end against the real server.
+delivery receipts, read state, emoji and stickers, file attachments, and voice
+and video calls all work end to end against the real server.
 
 ## Status
 
@@ -19,6 +19,7 @@ video calls all work end to end against the real server.
 | WebSockets: messages, typing, presence, receipts, group events | Done |
 | Voice and video calls (WebRTC, one-to-one and group mesh, TURN fallback) | Done |
 | Emoji picker and sticker sends | Done |
+| File attachments (upload endpoint, send preview, inline/chip rendering) | Done |
 | Development seed data | Done |
 | UI/UX design — tokens, design system, 21 screens | Done |
 | Frontend: auth, chat, groups, contacts, settings, dark mode, responsive | Done |
@@ -67,16 +68,18 @@ live.
 ```
 frontend/
   src/app/          routes: chat, login, register, verify, settings
-  src/components/   Avatar, Button, Chat, Composer, Sidebar, Modal, CallOverlay,
-                    PeoplePicker, ConversationInfo, EmojiPicker, CursorWave,
-                    Icon, ThemeToggle, NewGroupModal, NewMessageModal
+  src/components/   Avatar, Button, Chat, Composer, AttachmentPreview, Sidebar,
+                    Modal, CallOverlay, PeoplePicker, ConversationInfo,
+                    EmojiPicker, CursorWave, Icon, ThemeToggle, NewGroupModal,
+                    NewMessageModal
   src/lib/          api client, socket, auth context, state hook, adapters,
-                    call (WebRTC), emoji/sticker logic, DTO types, formatting
+                    call (WebRTC), emoji/sticker logic, attachment marking,
+                    DTO types, formatting
 backend/
   app/
-    main.py         application setup: CORS, routers, lifespan
+    main.py         application setup: CORS, routers, lifespan, /uploads static mount
     core/           configuration, security (hashing, tokens), service errors
-    api/            HTTP routes, dependencies, error-to-status mapping
+    api/            HTTP routes, dependencies, error-to-status mapping, uploads.py
     schemas/        Pydantic request/response contracts
     services/       business logic — the layer that owns the rules
     models/         SQLAlchemy models
@@ -87,6 +90,7 @@ backend/
   scripts/          smoke_e2e.py — live-server end-to-end test
   tests/            pytest suite
   docs/             model and schema conventions
+  uploads/          uploaded attachment files (created at runtime, gitignored)
 .github/workflows/ci.yml   CI: pytest, alembic check, smoke test, frontend build
 ```
 
@@ -127,6 +131,7 @@ access token. Full interactive documentation is at `/docs` when the server runs.
 | Conversations | `GET /api/conversations`, `POST /api/conversations/direct`, `GET /api/conversations/{id}`, `/members`, `/messages`, `POST .../read`, `PATCH .../mute` |
 | Messages | `PATCH/DELETE /api/messages/{id}` |
 | Groups | `POST /api/groups`, `PATCH /api/groups/{id}`, `POST/DELETE/PATCH .../members`, `POST .../leave` |
+| Uploads | `POST /api/uploads` — stores a file, returns its URL; served back out from `/uploads` |
 | Realtime | `ws://…/ws?token=…` — messages, typing, presence, receipts, call signalling |
 
 The socket is a notification channel, not a second API: writes go over HTTP,
@@ -232,6 +237,34 @@ every display context) rather than inferred from shape, because an earlier
 version that guessed made every short "👍" indistinguishable from a tapped
 sticker.
 
+## Attachments
+
+Picking a file with the composer's clip button opens a "Send attachment"
+dialog first, like Telegram and WhatsApp, instead of uploading immediately:
+a large preview for images, an embedded viewer for PDF, a player for video
+and audio, the first 4 KB for plain text, and a named/sized file card for
+anything a browser can't render (Word, Excel, zip). Nothing is uploaded until
+the person confirms, so cancelling — button, Escape, the close icon, or a
+click outside — leaves nothing orphaned in `backend/uploads/`.
+
+`POST /api/uploads` is authenticated, allowlisted (images, audio, video, PDF,
+plain text, docx/xlsx/zip — never anything a browser would execute), and
+capped at 20 MB; it writes the file to `backend/uploads/` under a random name
+and serves it back out via a `StaticFiles` mount at `/uploads`. The dialog
+enforces the same limit up front so an oversize file is refused before any
+bytes leave the browser rather than after a failed upload.
+
+An attachment adds no message column: it's marked inside the existing
+plain-text `content`, the same trick stickers use (`markSticker`/
+`parseSticker` in `lib/emoji.ts`, `markAttachment`/`parseAttachment` in
+`lib/attachment.ts`) — a different zero-width marker so the two are never
+confused. Because a message with an attachment is still "just text"
+everywhere else in the pipeline, replies, edits, deletion, the sidebar's
+last-message preview, and the websocket broadcast all keep working on it
+unchanged; editing is hidden instead, since there's no text to edit. Images
+render inline in the bubble; everything else renders as a named, sized,
+downloadable chip.
+
 ## Data model
 
 Seven tables:
@@ -313,9 +346,10 @@ Deliberate, and listed so they are not mistaken for oversights:
 - **Single process.** The socket registry is in memory, so a second worker
   would not see the first one's connections. `ConnectionManager.send_to_users`
   is the seam where a Redis pub/sub broker would slot in.
-- **Text messages only.** Attachments and voice notes are not implemented; the
-  message type column is sized to accept them later without a schema change.
-  Emoji and stickers are plain-text messages.
+- **Voice notes are not implemented.** File attachments (images, video, audio,
+  PDF, text, docx/xlsx/zip up to 20 MB) work; recording and sending audio
+  in-app does not. Emoji, stickers, and attachments are all still plain-text
+  messages under the hood — no schema change was needed for any of them.
 - **Calls are not recorded or logged.** No call history, no missed-call entry in
   the conversation — the server keeps no call state at all, by design. It also
   means a group call in progress is not advertised anywhere: someone who
