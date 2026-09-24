@@ -31,6 +31,28 @@ import type { Conversation, User } from "./types";
 
 export type CallKind = "audio" | "video";
 
+/** A limited, common set — Zoom- and Meet-style — rather than free text: a
+ *  reaction is a large emoji broadcast onto every other participant's screen,
+ *  and free text there would just be an unmoderated message with extra steps.
+ *  Mirrors ALLOWED_REACTIONS in backend/app/websocket/calls.py. */
+export const CALL_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "👏", "🎉"] as const;
+
+/** One reaction currently animating on screen, removed automatically once it
+ *  has had its moment — see FLOATING_REACTION_MS. */
+export interface FloatingReaction {
+  id: string;
+  emoji: string;
+  userId: number;
+  /** Fixed at creation so a reaction doesn't drift sideways over its own
+   *  lifetime; spread out so several sent close together don't stack on top
+   *  of one another. */
+  left: number;
+}
+
+/** How long a reaction hovers on screen before it disappears — long enough to
+ *  register, short enough that a burst of them doesn't clutter the call. */
+const FLOATING_REACTION_MS = 4000;
+
 /** `dialling` is waiting for them to pick up; `ringing` is being called. */
 export type CallStatus =
   | "idle"
@@ -364,6 +386,25 @@ export function useCall(meId: number) {
   /** Counts down while a call sits in "disconnected". See startStall. */
   const stallTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // --- reactions -------------------------------------------------------------
+
+  const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+  /** One timer per floating reaction, so teardown can cancel whichever are
+   *  still pending instead of letting them fire into a call that has ended. */
+  const reactionTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  /** Show one reaction on screen for FLOATING_REACTION_MS, then forget it. */
+  const addReaction = useCallback((emoji: string, userId: number) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const left = 20 + Math.random() * 60;
+    setReactions((current) => [...current, { id, emoji, userId, left }]);
+    const timer = setTimeout(() => {
+      reactionTimers.current.delete(timer);
+      setReactions((current) => current.filter((reaction) => reaction.id !== id));
+    }, FLOATING_REACTION_MS);
+    reactionTimers.current.add(timer);
+  }, []);
+
   // --- devices -------------------------------------------------------------
 
   const [devices, setDevices] = useState<CallDevices>({ mics: [], cameras: [] });
@@ -444,12 +485,16 @@ export function useCall(meId: number) {
     pendingOffer.current = null;
     ringingFrom.current = null;
     early.current.clear();
+
+    for (const timer of reactionTimers.current) clearTimeout(timer);
+    reactionTimers.current.clear();
   }, [closePeer]);
 
   /** End the call locally and show why, if there is anything worth saying. */
   const finish = useCallback(
     (error: string | null = null) => {
       teardown();
+      setReactions([]);
       setCall((current) =>
         current.status === "idle" && !error
           ? current
@@ -867,6 +912,19 @@ export function useCall(meId: number) {
     setCall((current) => ({ ...current, error: null }));
   }, []);
 
+  /** Send an emoji reaction to everyone else on the call.
+   *
+   *  Shown locally the instant it is picked, rather than waiting for the
+   *  round trip back from the server -- the point of a reaction is that it
+   *  feels instant to the person sending it, and the server never echoes a
+   *  call event back to its own sender anyway (see app/websocket/calls.py). */
+  const sendReaction = useCallback((emoji: string) => {
+    const id = conversationId.current;
+    if (id === null) return;
+    socket.send({ type: "call.reaction", conversation_id: id, emoji });
+    addReaction(emoji, meIdRef.current);
+  }, [addReaction]);
+
   // --- signalling ---------------------------------------------------------
 
   useEffect(() => {
@@ -1044,6 +1102,13 @@ export function useCall(meId: number) {
           break;
         }
 
+        case "call.reaction": {
+          if (!mine()) return;
+          const from = toUser(data.from_user as UserDTO);
+          addReaction(data.emoji as string, from.id);
+          break;
+        }
+
         case "call.ended": {
           if (!mine()) return;
           if (!isGroup.current) {
@@ -1090,7 +1155,7 @@ export function useCall(meId: number) {
     });
 
     return unsubscribe;
-  }, [finish, createPeer, closePeer, syncPeers, flushEarly]);
+  }, [finish, createPeer, closePeer, syncPeers, flushEarly, addReaction]);
 
   // A call must not outlive the page, or the camera stays on after navigation.
   useEffect(() => teardown, [teardown]);
@@ -1098,6 +1163,7 @@ export function useCall(meId: number) {
   return {
     call, start, accept, decline, hangup, toggleMic, toggleCamera, dismissError,
     devices, micDeviceId, cameraDeviceId, setMicDevice, setCameraDevice,
+    reactions, sendReaction,
   };
 }
 

@@ -256,6 +256,57 @@ def test_leaving_a_group_call_reaches_everyone(live, alice, bob, carol, token_fo
                     assert frame["data"]["from_user_id"] == alice.id
 
 
+def test_a_reaction_reaches_the_other_person(live, alice, bob, token_for, pair):
+    """A reaction carries no call state -- it is relayed the same way a
+    candidate is, to whoever else shares the conversation."""
+    with live.websocket_connect(f"/ws?token={token_for(bob)}") as callee:
+        _drain_ready(callee)
+        with live.websocket_connect(f"/ws?token={token_for(alice)}") as caller:
+            _drain_ready(caller)
+            caller.send_json({
+                "type": "call.reaction",
+                "conversation_id": pair.id,
+                "emoji": "🎉",
+            })
+
+            frame = _await_event(callee, "call.reaction")
+            assert frame["data"]["emoji"] == "🎉"
+            assert frame["data"]["from_user"]["username"] == "alice"
+
+
+def test_a_reaction_in_a_group_call_reaches_everyone_else(live, alice, bob, carol, token_for, team):
+    with live.websocket_connect(f"/ws?token={token_for(bob)}") as first:
+        _drain_ready(first)
+        with live.websocket_connect(f"/ws?token={token_for(carol)}") as second:
+            _drain_ready(second)
+            with live.websocket_connect(f"/ws?token={token_for(alice)}") as sender:
+                _drain_ready(sender)
+                sender.send_json({
+                    "type": "call.reaction",
+                    "conversation_id": team.id,
+                    "emoji": "👏",
+                })
+
+                for recipient in (first, second):
+                    frame = _await_event(recipient, "call.reaction")
+                    assert frame["data"]["emoji"] == "👏"
+                    assert frame["data"]["from_user"]["username"] == "alice"
+
+
+def test_an_unsupported_reaction_is_refused(live, alice, bob, token_for, pair):
+    """A closed set, not free text: sending anything outside it is not relayed
+    to the other end at all."""
+    with live.websocket_connect(f"/ws?token={token_for(alice)}") as caller:
+        _drain_ready(caller)
+        caller.send_json({
+            "type": "call.reaction",
+            "conversation_id": pair.id,
+            "emoji": "💩",
+        })
+        frame = _await_event(caller, "error")
+        assert "Unsupported reaction" in frame["data"]["detail"]
+
+
 def test_a_one_to_one_conversation_refuses_mesh_frames(live, alice, bob, token_for, pair):
     """The per-pair frames exist because a mesh has more than one pair. In a
     one-to-one call the negotiation rides on the invite and the accept, so an

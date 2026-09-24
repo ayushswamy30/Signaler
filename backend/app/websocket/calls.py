@@ -47,6 +47,9 @@ CLIENT_CANDIDATE = "call.candidate"
 # no offer, because each pair needs a different one.
 CLIENT_OFFER = "call.offer"
 CLIENT_ANSWER = "call.answer"
+# A reaction, fanned out like decline/hangup rather than addressed like a
+# mesh negotiation frame -- everyone on the call sees everyone else's.
+CLIENT_REACTION = "call.reaction"
 
 CLIENT_EVENTS = frozenset(
     {
@@ -57,10 +60,17 @@ CLIENT_EVENTS = frozenset(
         CLIENT_CANDIDATE,
         CLIENT_OFFER,
         CLIENT_ANSWER,
+        CLIENT_REACTION,
     }
 )
 
 CALL_TYPES = frozenset({"audio", "video"})
+
+# A closed set, not free text: a reaction is rendered as a large emoji
+# floating over every participant's screen, so anything typed here would be
+# arbitrary content broadcast straight into somebody else's call. Kept small
+# and common, the way Zoom's and Meet's own reaction trays are.
+ALLOWED_REACTIONS = frozenset({"👍", "❤️", "😂", "😮", "😢", "👏", "🎉"})
 
 # An offer with a long candidate list runs to a few kilobytes; this is generous
 # for that and still small enough that the signalling channel cannot be used to
@@ -248,6 +258,21 @@ def handle(db: Session, user: User, payload: dict[str, Any]) -> None:
                 conversation_id=conversation_id,
                 candidate=_checked_blob(payload.get("candidate"), "candidate"),
                 from_user_id=user.id,
+            ),
+        )
+        return
+
+    if event_type == CLIENT_REACTION:
+        emoji = payload.get("emoji")
+        if emoji not in ALLOWED_REACTIONS:
+            raise ValidationError("Unsupported reaction.")
+        events.publish(
+            others,
+            events.event(
+                events.CALL_REACTION,
+                conversation_id=conversation_id,
+                emoji=emoji,
+                from_user=sender,
             ),
         )
         return

@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { clsx } from "@/lib/clsx";
-import type { CallController, CallParticipant } from "@/lib/call";
+import { CALL_REACTIONS, type CallController, type CallParticipant, type FloatingReaction } from "@/lib/call";
 import { Icon } from "./Icon";
 import { Avatar, Button } from "./Primitives";
 
@@ -82,7 +82,10 @@ function useElapsed(startedAt: number | null) {
 }
 
 export function CallOverlay({ controller }: { controller: CallController }) {
-  const { call, accept, decline, hangup, toggleMic, toggleCamera, dismissError } = controller;
+  const {
+    call, accept, decline, hangup, toggleMic, toggleCamera, dismissError,
+    reactions, sendReaction,
+  } = controller;
 
   const localVideo = useStream(call.localStream);
   // One-to-one only. A group call has a stream per person, each attached by
@@ -93,10 +96,17 @@ export function CallOverlay({ controller }: { controller: CallController }) {
   const elapsed = useElapsed(call.startedAt);
   const [devicePickerOpen, setDevicePickerOpen] = useState(false);
   const devicePickerBox = useRef<HTMLDivElement>(null);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
+  const reactionPickerBox = useRef<HTMLDivElement>(null);
   // A new call starts this component back at "ringing"/"dialling" without
   // ever unmounting it, so a picker left open from the last one would
   // otherwise reappear already open.
-  useEffect(() => { if (call.status === "idle") setDevicePickerOpen(false); }, [call.status]);
+  useEffect(() => {
+    if (call.status === "idle") {
+      setDevicePickerOpen(false);
+      setReactionPickerOpen(false);
+    }
+  }, [call.status]);
 
   // The ref spans both the toggle button and the popover, so a click on the
   // button to close it does not also count as "outside" and reopen it.
@@ -117,6 +127,25 @@ export function CallOverlay({ controller }: { controller: CallController }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [devicePickerOpen]);
+
+  // Same pattern as the device picker above, for the reaction tray.
+  useEffect(() => {
+    if (!reactionPickerOpen) return;
+    function onPointerDown(event: PointerEvent) {
+      if (reactionPickerBox.current && !reactionPickerBox.current.contains(event.target as Node)) {
+        setReactionPickerOpen(false);
+      }
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setReactionPickerOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [reactionPickerOpen]);
 
   // A permission refusal or an unreachable peer is worth reporting even though
   // the call itself is over, so it renders on its own.
@@ -300,10 +329,76 @@ export function CallOverlay({ controller }: { controller: CallController }) {
                 onClick={toggleCamera}
               />
             )}
+            <div className="relative" ref={reactionPickerBox}>
+              <CallButton
+                label="Send a reaction"
+                pressed={reactionPickerOpen}
+                icon="smile"
+                onClick={() => setReactionPickerOpen((open) => !open)}
+              />
+              {reactionPickerOpen && (
+                <ReactionPicker
+                  onPick={(emoji) => {
+                    sendReaction(emoji);
+                    setReactionPickerOpen(false);
+                  }}
+                />
+              )}
+            </div>
             <CallButton label="Hang up" tone="danger" icon="close" onClick={hangup} />
           </>
         )}
       </div>
+
+      {/* Reactions float up from the bottom of the screen and fade on their
+          own — see FLOATING_REACTION_MS in lib/call.ts — so this layer never
+          has to be told to clear itself. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
+        {reactions.map((reaction) => (
+          <FloatingReactionEmoji key={reaction.id} reaction={reaction} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FloatingReactionEmoji({ reaction }: { reaction: FloatingReaction }) {
+  return (
+    <span
+      style={{ left: `${reaction.left}%` }}
+      className="absolute bottom-[140px] animate-reaction-float text-5xl drop-shadow-lg"
+    >
+      {reaction.emoji}
+    </span>
+  );
+}
+
+/** The tray of reactions a person can send, opened from the "smile" control.
+ *
+ *  A closed, common set rather than the chat composer's full emoji picker —
+ *  see CALL_REACTIONS — because these are shown large, to everyone, on top of
+ *  the call itself, not typed into a message only the recipient reads. */
+function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
+  return (
+    <div
+      role="menu"
+      aria-label="Send a reaction"
+      className="absolute bottom-full left-1/2 z-20 mb-md flex -translate-x-1/2 gap-xs
+        rounded-full border border-white/15 bg-[#141A21] px-md py-sm shadow-lg"
+    >
+      {CALL_REACTIONS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          role="menuitem"
+          aria-label={`Send ${emoji} reaction`}
+          onClick={() => onPick(emoji)}
+          className="flex h-10 w-10 items-center justify-center rounded-full text-2xl
+            transition-transform hover:scale-125 hover:bg-white/10"
+        >
+          {emoji}
+        </button>
+      ))}
     </div>
   );
 }
@@ -438,7 +533,7 @@ function CallButton({
   pressed = false,
 }: {
   label: string;
-  icon: "phone" | "video" | "close" | "mute" | "devices";
+  icon: "phone" | "video" | "close" | "mute" | "devices" | "smile";
   onClick: () => void;
   tone?: "neutral" | "danger" | "accept";
   pressed?: boolean;
