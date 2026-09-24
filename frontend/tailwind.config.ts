@@ -36,8 +36,20 @@ export default {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(300%)" },
         },
+        // A call reaction: rises and fades over the same 4s it stays in the
+        // DOM (FLOATING_REACTION_MS in lib/call.ts), so it is never yanked
+        // out mid-animation.
+        "reaction-float": {
+          "0%": { transform: "translateY(0) scale(0.5)", opacity: "0" },
+          "15%": { transform: "translateY(-20px) scale(1)", opacity: "1" },
+          "80%": { opacity: "1" },
+          "100%": { transform: "translateY(-180px) scale(1)", opacity: "0" },
+        },
       },
-      animation: { "boot-sweep": "boot-sweep 1.2s ease-in-out infinite" },
+      animation: {
+        "boot-sweep": "boot-sweep 1.2s ease-in-out infinite",
+        "reaction-float": "reaction-float 4s ease-out forwards",
+      },
       boxShadow: {
         xs: "0 1px 2px rgba(0,0,0,.06)", sm: "0 2px 6px rgba(0,0,0,.08)",
         md: "0 4px 12px rgba(0,0,0,.10)", lg: "0 8px 24px rgba(0,0,0,.14)",

@@ -43,6 +43,9 @@ CALL_UNAVAILABLE = "call.unavailable"
 CALL_JOINED = "call.joined"
 CALL_PEER_OFFER = "call.peer_offer"
 CALL_PEER_ANSWER = "call.peer_answer"
+# A reaction sent during a call -- one-to-one or group. Carries no state of
+# its own; see app/websocket/calls.py.
+CALL_REACTION = "call.reaction"
 
 CONVERSATION_CREATED = "conversation.created"
 CONVERSATION_UPDATED = "conversation.updated"
