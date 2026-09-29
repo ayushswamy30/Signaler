@@ -189,7 +189,7 @@ function Messenger() {
             </div>
 
             <div
-              className="flex flex-1 flex-col gap-[6px] overflow-y-auto px-lg py-lg md:px-xl"
+              className="chat-doodle-bg flex flex-1 flex-col gap-[6px] overflow-y-auto px-lg py-lg md:px-xl"
               role="log"
               aria-label="Message history"
             >
